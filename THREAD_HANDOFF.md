@@ -77,8 +77,14 @@ Player actions (stamina cost):
   until it completes an action (no stun-locking).
 - `sweep` (2) - reduced damage to every enemy, DEX-scaled, no crits
 - `guard` (1) - flat block, stackable within a turn
-- `ability` (2 + 1 charge/room) - Riposte: +3 block and counter the first
-  attacker
+- `dodge` (1) - the DEX GAMBLE: one roll for the whole enemy turn
+  (`dodgeBaseChance` 0.30 + 0.03/DEX above base, cap 0.65). Success = EVERY
+  attack whiffs (pierce and heavy included); failure = caught mid-step, every
+  hit lands at ×1.25. No fatigue; the risky mirror of Guard.
+- `ability` (2 + 1 charge/room) - Riposte: ULTIMATE BLOCK — arm the stance
+  and the single biggest attack that resolves while it holds is negated
+  ENTIRELY (0 damage, pierce/heavy included) and that attacker is countered.
+  The stance persists across rounds until an attack actually comes.
 - `end` (free) - end the turn
 
 Enemy intents: `strike`, `heavy`, `pierce` (ignores block), `aim` (next attack
@@ -165,6 +171,46 @@ Encounter shape (2026-07-03):
 - Riposte tooltip uses plain player language first ("negates damage for one
   attack, once per encounter") with the mechanical fine print second —
   discoverability over precision in the headline (designer copy).
+- RIPOSTE v3 (2026-07-04, designer: "is it not an ultimate block? should be"):
+  the mechanics now literally match the tooltip. Armed Riposte fully negates
+  the BIGGEST attack that resolves that round (`riposteParryIndex`) and
+  counters that one attacker; the old +3 block grant, block-stops-heavy
+  semantics, and counter-every-attacker are gone. The stance persists across
+  rounds until it fires. `expectedIncomingDamage` excludes the parried attack,
+  and the Vitals bar shows a ⛨ PARRY chip while armed.
+- DODGE (2026-07-04, playtester-proposed risk/reward gamble, designer-approved):
+  new 1-STA action + key `6`. One roll per enemy turn; fail = ×1.25 damage
+  taken that round (`dodgeFailDamageTakenMultiplier`). First cut (35%+4%/DEX,
+  cap 75%, NO fail penalty) plus riposte v3 sent the skilled bot to 40.5%
+  wins — riposte v3 alone was 20%. Final numbers (30%/3%/65% + penalty) plus
+  the enemy-curve raise below brought it back. The bot dodges as a lethal-turn
+  hail-mary and when EV (priced with the fail penalty) beats guarding;
+  `SIM_NO_DODGE=1` disables the bot's dodge rule for A/B probes.
+- ENEMY CURVE raised to absorb the new defensive toolkit (2026-07-04):
+  `hpGrowth`/`damageGrowth` 1.44/1.45 -> 1.52/1.52. This also answers the
+  designer's standing complaint that L2/L3 enemies "don't scale enough" —
+  base L1 stats unchanged, mid floors bite harder. SAVE_VERSION bumped to 2
+  (Player.dodging + stats.actions.dodge).
+- AFFLICTIONS (2026-07-04, designer request from an OP-feeling run log):
+  player-applied enemy statuses via on-hit gear — see `STATUS` in core.ts.
+  poison N ticks at the PLAYER's turn start then fades 1; bleed N ticks
+  right BEFORE the enemy acts (it can die without swinging) then fades 1;
+  sunder N saps its telegraphed damage (floor 1, telegraph updates the
+  moment it lands) and fades 1/round. All ticks bypass block ("the shield
+  does not stop the venom"). Applied by EVERY damaging player hit including
+  each Sweep cut — the intended multi-enemy affliction build (sweep tip
+  advertises it when such gear is worn). Stacks cap at `STATUS.maxStacks`
+  (9). Enemy support HEALS also CLEANSE all afflictions (healers now target
+  afflicted allies too) — status builds must kill the healer first. DoT
+  kills clear rooms but do NOT proc on-kill gear. New EffectKeys
+  poison_on_hit (rare+, charm/focus), bleed_on_hit (very-rare+, relic/focus),
+  sunder_on_hit (epic+, shield/focus). UI: colour-coded icon chips with live
+  stack counts + explainer tooltips under each enemy HP bar, coloured floats
+  on application and ticks, full log lines. SAVE_VERSION -> 3.
+- Post-affliction retune (2026-07-04): afflictions + the unique-frequency
+  trim (`uniqueOptionChance` 0.007 -> 0.005, from the designer's
+  two-uniques-by-F2 run) pushed the bot to 8.1%; growth raised
+  1.52 -> **1.54** landing the 1500-run probe at 3.7%.
 - UX BACKLOG from external playtest (owner to prioritize, none blocking):
   distinct battle-vs-exploration presentation; colour-coded stat bars;
   full-stat hover comparison on loot (current -> with-item); per-effect chip
@@ -221,6 +267,13 @@ Enemy attack-type labels in the mapper include placeholders such as `burn`, `poi
   fails if a class never fires. `pnpm loot:preview` prints sample drops per
   rarity for eyeballing names/effects.
 - Every gear effect firing increments `stats.effectTriggers` in GameState.
+- NERF (2026-07-04, designer report "Skeleton Ring is OP — pre-clears
+  L2/L3"): `battle_start_bolt` magnitudes capped to `[1, 2, 2, 3, 4]` (unique
+  was 7), and the opening bolt now SOFTENS but never kills — every enemy
+  survives it at 1 HP minimum (no more walking into pre-cleared rooms). A
+  flat opening AoE is worth far more against early-floor HP pools than the
+  rarity-tier math suggests, so it is deliberately capped below the curve.
+  Covered by a "bolt never kills" unit test in core.test.ts.
 
 ## Important Design Decisions
 
@@ -295,20 +348,25 @@ Machine-readable metrics live in:
   Python/legacy snapshot; not a tuning target
 
 React engine skilled-policy batch (2026-07-04, seed `920000`, 5000 runs, after
-bash postpone+re-roll, guard fatigue, and the growth-heals reversal;
-`ENEMY_CURVE` `16 hp ×1.44` / `4 dmg ×1.45`, boss `×3.4/×1.35`, elite
+riposte-v3 ultimate block, dodge, afflictions (poison/bleed/sunder), the
+battle_start_bolt nerf, and the unique-frequency trim;
+`ENEMY_CURVE` `16 hp ×1.54` / `4 dmg ×1.54`, boss `×3.4/×1.35`, elite
 `×1.9/×1.3`):
 
-- win rate: `3.90%`
-- average rooms cleared: `28.2`
-- reach L3: `99.2%`, L4: `80.3%`, L5: `10.9%`
-- deaths by room kind: boss `2195`, elite `2169`, then P3/P4 ~130 each —
-  premium fights are ~90% of deaths.
+- win rate: `3.88%`
+- average rooms cleared: `28.8`
+- reach L3: `99.8%`, L4: `82.4%`, L5: `20.2%`
+- deaths by room kind: boss `1907`, elite `1910`, then P3 `311` / P2 `272` /
+  P4 `236` — premium fights still dominate but ordinary encounters now claim
+  ~20% (the "L1-L3 free" shape is finally softening).
 - timeouts: `0`
+- effect audit: every affliction fires ~85-94×/run at epic magnitude;
+  paired-seed lift poison `+2.5pts` / bleed `+8.3pts` / sunder `+1.7pts` —
+  bleed is the strongest single effect in the game, WATCH it in real runs.
 
 Random-policy batch (2000 runs, same dungeon seeds):
 
-- win rate `0%`, average rooms cleared `3.5` — the mid-floor elite is a hard
+- win rate `0%`, average rooms cleared `3.3` — the mid-floor elite is a hard
   wall for random play (slightly below the "survives much of L1" pillar;
   revisit if manual playtests feel too brutal early).
 

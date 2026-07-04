@@ -47,28 +47,65 @@ function compareDelta(item: Item, current: Item): number | null {
   return null;
 }
 
-function CompareLine({ state, item }: { state: GameState; item: Item }): JSX.Element | null {
+function deltaTone(delta: number | null): string {
+  if (delta == null) return "info";
+  return delta > 0 ? "up" : delta < 0 ? "down" : "even";
+}
+
+/**
+ * The item this card would replace, shown as a mini card under the offer so
+ * the trade reads side-by-side: sprite, name, core numbers, and the delta.
+ */
+function EquippedCompare({ state, item }: { state: GameState; item: Item }): JSX.Element | null {
   if (item.kind === "consumable") return null;
   const current = activeItemForSlot(state.player, slotForItem(item));
+
   if (!current) {
     // the weapon slot is never truly empty — compare against the active weapon
     if (item.kind === "weapon" && item.weapon) {
-      const delta = item.weapon.damage - state.player.weapon.damage;
+      const weapon = state.player.weapon;
+      const delta = item.weapon.damage - weapon.damage;
+      const kind: LootIconKind = /axe/i.test(weapon.name) ? "axe" : /rapier|needle|staff|wand|bow/i.test(weapon.name) ? "rapier" : "sword";
       return (
-        <div className="hd-loot-compare" data-tone={delta > 0 ? "up" : delta < 0 ? "down" : "even"}>
-          Now: {state.player.weapon.name} ({state.player.weapon.damage} dmg)
-          {delta !== 0 ? <b> · {humanGain(delta)}</b> : <b> · even</b>}
+        <div className="hd-loot-current" title={`Equipped: ${weapon.name}`}>
+          <span className="hd-loot-current-tag">NOW</span>
+          <ItemSprite kind={kind} size={26} />
+          <span className="hd-loot-current-body">
+            <span className="hd-loot-current-name">{weapon.name}</span>
+            <span className="hd-loot-current-val">{weapon.damage} dmg</span>
+          </span>
+          <b className="hd-loot-current-delta" data-tone={deltaTone(delta)}>{delta === 0 ? "even" : humanGain(delta)}</b>
         </div>
       );
     }
-    return <div className="hd-loot-compare" data-tone="new">Empty slot — pure upgrade</div>;
+    return (
+      <div className="hd-loot-current" data-empty="true">
+        <span className="hd-loot-current-tag">NOW</span>
+        <span className="hd-loot-current-body">
+          <span className="hd-loot-current-name">Empty slot</span>
+          <span className="hd-loot-current-val">pure upgrade</span>
+        </span>
+        <b className="hd-loot-current-delta" data-tone="up">new</b>
+      </div>
+    );
   }
+
   const delta = compareDelta(item, current);
   return (
-    <div className="hd-loot-compare" data-tone={delta == null ? "info" : delta > 0 ? "up" : delta < 0 ? "down" : "even"}>
-      Now: {current.name} ({coreValue(current)})
-      {delta != null && delta !== 0 && <b> · {humanGain(delta)}</b>}
-      {delta === 0 && <b> · even</b>}
+    <div
+      className="hd-loot-current"
+      style={{ "--rarity": RARITY_VAR[current.rarity] } as CSSProperties}
+      title={`Equipped: ${current.name} — ${current.desc}`}
+    >
+      <span className="hd-loot-current-tag">NOW</span>
+      <ItemSprite kind={iconFor(current)} size={26} tier={current.tier} coord={current.sprite} />
+      <span className="hd-loot-current-body">
+        <span className="hd-loot-current-name">{current.name}</span>
+        <span className="hd-loot-current-val">{coreValue(current) || current.rarity}</span>
+      </span>
+      <b className="hd-loot-current-delta" data-tone={deltaTone(delta)}>
+        {delta == null ? "≠" : delta === 0 ? "even" : humanGain(delta)}
+      </b>
     </div>
   );
 }
@@ -125,7 +162,7 @@ export function LootDraft({ state, onPick }: { state: GameState; onPick: (choice
             </div>
             <div className="hd-loot-name">{item.name}</div>
             <div className="hd-loot-desc">{item.desc}</div>
-            <CompareLine state={state} item={item} />
+            <EquippedCompare state={state} item={item} />
             <div className="hd-loot-tag">{slotTag(item)}</div>
           </div>
         ))}

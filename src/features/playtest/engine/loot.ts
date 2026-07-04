@@ -180,7 +180,9 @@ const STAT_BY_SLOT: Record<Exclude<TrinketSlotKind, "focus">, StatKey> = {
 const EFFECT_TABLE: Record<EffectKey, { minTier: number; values: [number, number, number, number, number] }> = {
   thorns: { minTier: 3, values: [1, 2, 3, 4, 5] },
   battle_start_block: { minTier: 3, values: [2, 3, 4, 6, 8] },
-  battle_start_bolt: { minTier: 3, values: [1, 2, 3, 5, 7] },
+  // capped low: a flat opening AoE is worth far more against early-floor HP
+  // pools than the tier math suggests (a +7 unique was pre-clearing L2/L3)
+  battle_start_bolt: { minTier: 3, values: [1, 2, 2, 3, 4] },
   stamina_on_kill: { minTier: 5, values: [1, 1, 1, 1, 1] },
   heal_on_kill: { minTier: 4, values: [1, 1, 1, 2, 3] },
   heal_on_clear: { minTier: 3, values: [1, 1, 2, 2, 3] },
@@ -192,14 +194,19 @@ const EFFECT_TABLE: Record<EffectKey, { minTier: number; values: [number, number
   potion_boost: { minTier: 3, values: [2, 3, 4, 6, 8] },
   crit_chance: { minTier: 3, values: [0.04, 0.06, 0.08, 0.12, 0.16] },
   crit_splash: { minTier: 3, values: [1, 2, 3, 4, 6] },
+  // afflictions: applied on EVERY damaging hit (each sweep cut included), so
+  // magnitudes stay small — a sweep against 3 foes is 3 applications a swing
+  poison_on_hit: { minTier: 3, values: [1, 1, 2, 2, 3] },
+  bleed_on_hit: { minTier: 4, values: [1, 1, 1, 2, 3] },
+  sunder_on_hit: { minTier: 5, values: [1, 1, 1, 1, 2] },
 };
 
 const EFFECT_POOL_BY_SLOT: Record<TrinketSlotKind, EffectKey[]> = {
   amulet: ["heal_on_clear", "potion_boost", "heal_on_kill", "thorns"],
-  charm: ["deny_bonus", "heal_on_kill", "crit_splash", "battle_start_bolt"],
-  relic: ["crit_chance", "stamina_on_kill", "deny_bonus", "crit_splash"],
-  shield: ["thorns", "battle_start_block", "counter_bonus", "guard_heavy_block", "guard_pierce_block"],
-  focus: ["battle_start_bolt", "crit_splash", "battle_start_block", "potion_boost", "counter_bonus", "stamina_on_kill", "max_stamina"],
+  charm: ["deny_bonus", "heal_on_kill", "crit_splash", "battle_start_bolt", "poison_on_hit"],
+  relic: ["crit_chance", "stamina_on_kill", "deny_bonus", "crit_splash", "bleed_on_hit"],
+  shield: ["thorns", "battle_start_block", "counter_bonus", "guard_heavy_block", "guard_pierce_block", "sunder_on_hit"],
+  focus: ["battle_start_bolt", "crit_splash", "battle_start_block", "potion_boost", "counter_bonus", "stamina_on_kill", "max_stamina", "poison_on_hit", "bleed_on_hit", "sunder_on_hit"],
 };
 
 function effectTier(power: number, isUnique: boolean): number {
@@ -566,6 +573,10 @@ const EFFECT_POINT_WORTH: Record<EffectKey, number> = {
   potion_boost: 0.5,
   crit_chance: 20,
   crit_splash: 1.2,
+  // multiplied per-hit and per-target: point-for-point the strongest offense
+  poison_on_hit: 2.2,
+  bleed_on_hit: 2,
+  sunder_on_hit: 2.5,
 };
 
 function effectsPolicyScore(effects: ItemEffect[] | undefined): number {

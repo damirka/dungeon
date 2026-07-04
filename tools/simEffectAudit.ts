@@ -33,7 +33,7 @@ const OUT = resolve(process.cwd(), "data/effect_audit_latest.json");
 const AUDIT_VALUES: Record<EffectKey, number> = {
   thorns: 3,
   battle_start_block: 4,
-  battle_start_bolt: 3,
+  battle_start_bolt: 2,
   stamina_on_kill: 1,
   heal_on_kill: 2,
   heal_on_clear: 2,
@@ -45,6 +45,9 @@ const AUDIT_VALUES: Record<EffectKey, number> = {
   potion_boost: 4,
   crit_chance: 0.08,
   crit_splash: 3,
+  poison_on_hit: 2,
+  bleed_on_hit: 2,
+  sunder_on_hit: 1,
 };
 
 function withEffectItem(key: EffectKey, value: number) {

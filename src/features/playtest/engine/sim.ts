@@ -1,4 +1,5 @@
 import {
+  TACTICAL,
   abilityAvailable,
   advanceRoom,
   applyAction,
@@ -9,6 +10,7 @@ import {
   expectedPlayerDamage,
   guardBlockAmount,
   newGame,
+  playerDodgeChance,
   resolveLoot,
   selectTarget,
   type EffectKey,
@@ -157,6 +159,21 @@ export function chooseSimAction(s: GameState): PlayerAction {
   // Riposte is the once-per-room premium: spend it only on boss/elite pressure.
   if (abilityAvailable(p) && !s.riposteArmed && incoming >= p.hp * 0.25 && isPriorityThreat(target)) return "ability";
 
+  // Dodge: the DEX gamble. Two spots — a hail-mary when guard cannot stop a
+  // lethal turn, and an EV play when the odds are good and guard would only
+  // chip the incoming hit. (env flag read via globalThis: this module is also
+  // bundled for the browser, where Node's `process` global does not exist.)
+  const noDodge = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.SIM_NO_DODGE;
+  if (!noDodge && canAffordAction(p, "dodge") && !p.dodging && incoming > 0) {
+    const chance = playerDodgeChance(p);
+    const guardBlock = canAffordAction(p, "guard") ? guardBlockAmount(p) : 0;
+    const afterGuard = expectedIncomingDamage(s, guardBlock);
+    if (incoming >= p.hp && afterGuard >= p.hp && chance > 0.25) return "dodge"; // guard can't save you — flip the coin
+    // EV gate prices in the caught-mid-step amplification on a failed roll
+    const dodgeExpected = (1 - chance) * incoming * TACTICAL.dodgeFailDamageTakenMultiplier;
+    if (chance >= 0.5 && incoming >= p.hp * 0.3 && dodgeExpected < afterGuard * 0.8) return "dodge";
+  }
+
   // Guard when the telegraphed damage is lethal, or whenever a guard converts
   // efficiently (absorbs most of its block) and no kill is on the table —
   // trading 1 stamina to erase a Heavy is how boss fights are survived.
@@ -230,7 +247,7 @@ export const bashHeavyPolicy: SimPolicy = {
   chooseLoot: skilledPolicy.chooseLoot,
 };
 
-const RANDOM_ACTIONS: PlayerAction[] = ["attack", "heavy", "sweep", "bash", "guard", "ability", "end"];
+const RANDOM_ACTIONS: PlayerAction[] = ["attack", "heavy", "sweep", "bash", "guard", "dodge", "ability", "end"];
 
 export const randomPolicy: SimPolicy = {
   name: "random",
@@ -243,6 +260,7 @@ export const randomPolicy: SimPolicy = {
     const options = RANDOM_ACTIONS.filter((action) => {
       if (action === "ability") return abilityAvailable(s.player) && !s.riposteArmed;
       if (action === "bash") return bashAvailable(s.player);
+      if (action === "dodge") return !s.player.dodging && canAffordAction(s.player, "dodge");
       return canAffordAction(s.player, action);
     });
     return options[Math.floor(Math.random() * options.length)] || "attack";
@@ -324,7 +342,7 @@ function summarizeResults(results: SimRunResult[], runs: number, seed: number, p
   const rooms = results.map((result) => result.roomsCleared).sort((a, b) => a - b);
   const deathsByLevel: Record<string, number> = {};
   const deathsByRoomKind: Record<string, number> = {};
-  const actions: Record<PlayerAction, number> = { attack: 0, heavy: 0, sweep: 0, bash: 0, guard: 0, ability: 0, end: 0 };
+  const actions: Record<PlayerAction, number> = { attack: 0, heavy: 0, sweep: 0, bash: 0, guard: 0, dodge: 0, ability: 0, end: 0 };
 
   for (const result of results) {
     if (result.deathRoom) {

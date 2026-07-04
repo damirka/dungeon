@@ -8,6 +8,7 @@ import {
   LOOT,
   POWER_BANDS,
   STATS,
+  STATUS,
   TACTICAL,
   abilityAvailable,
   actionDamage,
@@ -33,7 +34,9 @@ import {
   newGame,
   pct,
   playerCritChance,
+  playerDodgeChance,
   recalculatePlayerFromGear,
+  riposteParryIndex,
   resolveLoot,
   skipTrainingBudget,
   strengthDamageBonus,
@@ -86,11 +89,15 @@ describe("balance constants contract", () => {
     expect(actionStaminaCost("sweep")).toBe(2);
     expect(actionStaminaCost("bash")).toBe(2);
     expect(actionStaminaCost("guard")).toBe(1);
+    expect(actionStaminaCost("dodge")).toBe(1);
     expect(actionStaminaCost("end")).toBe(0);
     expect(actionStaminaCost("ability")).toBe(ABILITY.staminaCost);
     expect(ABILITY.staminaCost).toBe(2);
-    expect(ABILITY.block).toBe(3);
     expect(TACTICAL.bashChargesPerRoom).toBe(2);
+    expect(TACTICAL.dodgeBaseChance).toBe(0.3);
+    expect(TACTICAL.dodgeChancePerDexterity).toBe(0.03);
+    expect(TACTICAL.maxDodgeChance).toBe(0.65);
+    expect(TACTICAL.dodgeFailDamageTakenMultiplier).toBe(1.25);
   });
 
   it("pins action identities and telegraphed intent multipliers", () => {
@@ -112,6 +119,11 @@ describe("balance constants contract", () => {
     expect(DUNGEON.encountersPerLevel).toBe(7);
     expect(ENEMY_CURVE.baseHp).toBe(16);
     expect(ENEMY_CURVE.baseDamage).toBe(4);
+    // growth raised to 1.52 when Riposte became a true one-attack negation and
+    // Dodge landed (2026-07-04) — the new defensive toolkit had pushed the
+    // skilled bot from 3.5% to 26% wins; this pulls it back to ~4%
+    expect(ENEMY_CURVE.hpGrowth).toBe(1.54);
+    expect(ENEMY_CURVE.damageGrowth).toBe(1.54);
     expect(ENEMY_CURVE.bossHpMultiplier).toBe(3.4);
     expect(ENEMY_CURVE.bossDamageMultiplier).toBe(1.35);
     expect(LOOT.wearableSlotLimit).toBe(6);
@@ -541,20 +553,30 @@ describe("crits", () => {
 describe("riposte", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("arms block, counters the first attacker, and a counter kill clears the room", () => {
+  it("negates the attack entirely, and a counter kill clears the room", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.4); // no crits
     const base = advanceRoom(beginRun(newGame()));
     const foe = withIntent(base.enemies[0], "strike", { hp: 3, maxHp: 10 });
     let s = { ...base, enemies: [foe], selected: 0, player: { ...base.player, hp: 30, stamina: 3, abilityCharges: 1 } };
     s = applyAction(s, "ability");
     expect(s.riposteArmed).toBe(true);
-    expect(s.player.block).toBe(ABILITY.block);
     s = applyAction(s, "end");
-    // strike 4 - 3 block = 1 damage taken; counter deals 4 and kills the foe.
-    // (hp is then nudged up by the post-room training gain, so check the stat)
-    expect(s.stats.damageTaken).toBe(1);
+    // the strike (4) is negated whole; the counter deals 4 and kills the foe
+    expect(s.stats.damageTaken).toBe(0);
     expect(s.enemies[0].hp).toBe(0);
     expect(s.phase).toBe("loot");
+  });
+
+  it("the stance holds across rounds until an attack actually comes", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.86); // enemies keep rolling guard
+    const base = advanceRoom(beginRun(newGame()));
+    const foe = withIntent(base.enemies[0], "guard", { hp: 50, maxHp: 50 });
+    let s = { ...base, enemies: [foe], selected: 0, player: { ...base.player, stamina: 3, abilityCharges: 1 } };
+    s = applyAction(s, "ability");
+    s = applyAction(s, "end");
+    // no attack came — the armed stance survives into the next round
+    expect(s.riposteArmed).toBe(true);
+    expect(s.player.abilityCharges).toBe(0);
   });
 });
 
@@ -777,17 +799,20 @@ describe("heavy exposes + riposte counters all", () => {
     expect(s.enemies[0].exposed).toBe(false); // combo window closes with the round
   });
 
-  it("riposte counters EVERY attacker that turn", () => {
+  it("riposte negates only the BIGGEST attack and counters that one attacker", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.4);
     const base = advanceRoom(beginRun(newGame()));
-    const foe = (over: Partial<Enemy>) => withIntent(base.enemies[0], "strike", { hp: 50, maxHp: 50, ...over });
-    let s = { ...base, enemies: [foe({}), foe({})], selected: 0 };
-    s = applyAction(s, "ability"); // +3 block, armed
+    const strikeFoe = withIntent(base.enemies[0], "strike", { hp: 50, maxHp: 50 }); // telegraphs 4
+    const heavyFoe = withIntent(base.enemies[0], "heavy", { hp: 50, maxHp: 50 }); // telegraphs 6 — the big one
+    let s = { ...base, enemies: [strikeFoe, heavyFoe], selected: 0 };
+    s = applyAction(s, "ability"); // armed, no block granted
     s = applyAction(s, "end");
-    // both strikes resolve (4-3 block = 1, then 4) and BOTH eat a 4-damage counter
-    expect(s.stats.damageTaken).toBe(5);
-    expect(s.enemies[0].hp).toBe(46);
+    // the heavy (6) is negated whole and its owner countered for 4;
+    // the plain strike (4) still lands in full
+    expect(s.stats.damageTaken).toBe(4);
+    expect(s.enemies[0].hp).toBe(50);
     expect(s.enemies[1].hp).toBe(46);
+    expect(s.riposteArmed).toBe(false); // fired — once per encounter
   });
 });
 
@@ -875,29 +900,70 @@ describe("loot QoL", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Riposte perfect parry: while armed, block is fully effective against heavy.
+// Riposte the ultimate block: it eats even a crushing Heavy whole, ignoring
+// block math entirely, and the HUD's expected-incoming agrees.
 // ---------------------------------------------------------------------------
-describe("riposte perfect parry", () => {
+describe("riposte vs heavy", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("an armed riposte makes block absorb a heavy at full value", () => {
+  it("an armed riposte negates a heavy entirely — no crush math applies", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.4); // no crits
     const base = advanceRoom(beginRun(newGame()));
     const foe = withIntent(base.enemies[0], "heavy", { hp: 50, maxHp: 50 }); // telegraphs 6
     let s = { ...base, enemies: [foe], selected: 0 };
-    s = applyAction(s, "ability"); // +3 block, parry armed
-    s = applyAction(s, "guard"); // +4 -> 7 block total, stamina 0 -> enemy turn
-    // heavy 6 vs 7 block at FULL value (parry): take 0; counter lands
+    s = applyAction(s, "ability"); // parry armed
+    s = applyAction(s, "guard"); // stamina 0 -> enemy turn
     expect(s.player.hp).toBe(30);
+    expect(s.stats.damageTaken).toBe(0); // negated whole — no crush math ran
     expect(s.enemies[0].hp).toBe(46); // 50 - 4 counter
   });
 
-  it("expected incoming matches the parry math while armed", () => {
+  it("expected incoming excludes the parried (biggest) attack while armed", () => {
     const dungeon = buildDungeon(() => 0);
-    const heavyFoe = withIntent(dungeon[1].enemies[0], "heavy"); // 6
-    const s = { ...newGame(), enemies: [heavyFoe], riposteArmed: true };
-    s.player.block = 6;
-    expect(expectedIncomingDamage(s)).toBe(0); // full-value block, no crush
+    const heavyFoe = withIntent(dungeon[1].enemies[0], "heavy"); // 6 — parried
+    const strikeFoe = withIntent(dungeon[1].enemies[0], "strike"); // 4 — still lands
+    const s = { ...newGame(), enemies: [heavyFoe, strikeFoe], riposteArmed: true };
+    s.player.block = 0;
+    expect(riposteParryIndex(s)).toBe(0);
+    expect(expectedIncomingDamage(s)).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dodge: the DEX gamble — one roll, all or nothing.
+// ---------------------------------------------------------------------------
+describe("dodge", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("scales with DEX and is hard-capped", () => {
+    const p = newGame().player;
+    expect(playerDodgeChance(p)).toBeCloseTo(0.3); // base DEX
+    expect(playerDodgeChance({ ...p, dexterity: p.dexterity + 5 })).toBeCloseTo(0.45);
+    expect(playerDodgeChance({ ...p, dexterity: p.dexterity + 50 })).toBe(TACTICAL.maxDodgeChance);
+  });
+
+  it("a successful dodge slips EVERY attack that round", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.2); // 0.2 < 0.3 -> dodge succeeds
+    const base = advanceRoom(beginRun(newGame()));
+    const foe = (intent: "strike" | "heavy") => withIntent(base.enemies[0], intent, { hp: 50, maxHp: 50 });
+    let s = { ...base, enemies: [foe("strike"), foe("heavy")], selected: 0 };
+    s = applyAction(s, "dodge"); // 1 STA
+    expect(s.player.stamina).toBe(2);
+    expect(s.player.dodging).toBe(true);
+    s = applyAction(s, "end");
+    expect(s.stats.damageTaken).toBe(0);
+    expect(s.player.dodging).toBe(false); // the gamble covers exactly one enemy turn
+  });
+
+  it("a failed dodge means getting caught mid-step: every hit lands amplified", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.4); // 0.4 > 0.3 -> dodge fails
+    const base = advanceRoom(beginRun(newGame()));
+    const foe = withIntent(base.enemies[0], "strike", { hp: 50, maxHp: 50 }); // telegraphs 4
+    let s = { ...base, enemies: [foe], selected: 0 };
+    s = applyAction(s, "dodge");
+    s = applyAction(s, "end");
+    expect(s.stats.damageTaken).toBe(5); // round(4 * 1.25) — the gamble's downside
+    expect(s.player.dodging).toBe(false);
   });
 });
 
@@ -941,5 +1007,132 @@ describe("guard fatigue", () => {
     s = applyAction(s, "guard");
     s = applyAction(s, "guard");
     expect(s.player.block).toBe(8); // 2 x 4, same-round stacking at full value
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Opening bolt softens but never kills.
+// ---------------------------------------------------------------------------
+describe("opening bolt no-kill floor", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("a bolt bigger than an enemy's HP leaves it alive at 1", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.4);
+    let base = beginRun(newGame());
+    const gear: Item = {
+      kind: "focus", slot: "focus", name: "Test Orb", desc: "", power: 10,
+      isUnique: false, rarity: "legendary", effects: [{ key: "battle_start_bolt", value: 5 }],
+    };
+    base = { ...base, player: { ...base.player, items: [gear] } };
+    recalculatePlayerFromGear(base);
+    // shrink the first encounter's enemy below the bolt value
+    base.dungeon[1] = {
+      ...base.dungeon[1],
+      enemies: [{ ...base.dungeon[1].enemies[0], maxHp: 3, hp: 3 }],
+    };
+    const s = advanceRoom(base);
+    expect(s.phase).toBe("combat"); // the room was NOT pre-cleared
+    expect(s.enemies[0].hp).toBe(1); // softened to the floor, not killed
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Afflictions: poison / bleed / sunder — applied through block on every hit,
+// ticking outside the block system, cleansed by enemy heals.
+// ---------------------------------------------------------------------------
+describe("afflictions", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function afflictedRoom(effects: { key: EffectKey; value: number }[], foes: Partial<Enemy>[]) {
+    vi.spyOn(Math, "random").mockReturnValue(0.4); // no crits, stable intents
+    const base = advanceRoom(beginRun(newGame()));
+    const gear: Item = {
+      kind: "focus", slot: "focus", name: "Test Focus", desc: "", power: 10,
+      isUnique: false, rarity: "legendary", effects,
+    };
+    let s = { ...base, player: { ...base.player, items: [gear] } };
+    recalculatePlayerFromGear(s);
+    const enemies = foes.map((over) => {
+      const foe = { ...base.enemies[0], ...over };
+      foe.intentDamage = enemyIntentDamage(foe, foe.intent);
+      return foe;
+    });
+    return { ...s, enemies, selected: 0 };
+  }
+
+  it("pins the status constants", () => {
+    expect(STATUS.maxStacks).toBe(9);
+    expect(STATUS.poisonDecayPerTick).toBe(1);
+    expect(STATUS.bleedDecayPerTick).toBe(1);
+    expect(STATUS.sunderDecayPerRound).toBe(1);
+  });
+
+  it("poison stacks per hit, ticks at YOUR turn start past block, then fades by 1", () => {
+    let s = afflictedRoom([{ key: "poison_on_hit", value: 2 }], [{ intent: "strike", hp: 50, maxHp: 50 }]);
+    s = applyAction(s, "attack"); // 4 dmg, poison 2
+    expect(s.enemies[0].poison).toBe(2);
+    s = applyAction(s, "attack"); // poison 4
+    s = applyAction(s, "attack"); // poison 6, stamina 0 -> round resolves
+    // 50 - 12 direct - 6 poison tick = 32; stacks fade to 5
+    expect(s.enemies[0].hp).toBe(32);
+    expect(s.enemies[0].poison).toBe(5);
+    expect(s.stats.effectTriggers.poison_on_hit).toBe(3);
+  });
+
+  it("bleed ticks BEFORE the enemy acts — a bleeding foe can die without swinging", () => {
+    let s = afflictedRoom([{ key: "bleed_on_hit", value: 3 }], [{ intent: "strike", hp: 6, maxHp: 50 }]);
+    s = applyAction(s, "attack"); // 4 dmg -> 2 hp, bleed 3
+    expect(s.enemies[0].bleed).toBe(3);
+    s = applyAction(s, "end");
+    // bleed 3 kills it before its strike lands
+    expect(s.stats.damageTaken).toBe(0);
+    expect(s.enemies[0].hp).toBe(0);
+    expect(s.phase).toBe("loot");
+  });
+
+  it("sunder saps the live telegraph immediately and fades each round", () => {
+    let s = afflictedRoom([{ key: "sunder_on_hit", value: 2 }], [{ intent: "strike", hp: 60, maxHp: 60 }]);
+    expect(s.enemies[0].intentDamage).toBe(4);
+    s = applyAction(s, "attack"); // sunder 2 -> telegraph drops NOW
+    expect(s.enemies[0].sunder).toBe(2);
+    expect(s.enemies[0].intentDamage).toBe(2);
+    s = applyAction(s, "end");
+    s = applyAction(s, "end");
+    // it hit for the sapped 2, then sunder faded 2 -> 1 -> 0 across round ends
+    expect(s.stats.damageTaken).toBeGreaterThan(0);
+    expect(s.enemies[0].sunder).toBeLessThan(2);
+  });
+
+  it("an enemy heal CLEANSES every affliction from its target", () => {
+    let s = afflictedRoom([], [
+      { intent: "guard", hp: 50, maxHp: 50 },
+      { intent: "heal", hp: 40, maxHp: 40, archetype: "mage", tags: ["mage-support"] },
+    ]);
+    s.enemies[0].poison = 4;
+    s.enemies[0].bleed = 2;
+    s.enemies[0].sunder = 1;
+    s = applyAction(s, "end");
+    expect(s.enemies[0].poison).toBe(0);
+    expect(s.enemies[0].sunder).toBe(0);
+    // bleed ticked once before the heal acted, then the cleanse wiped the rest
+    expect(s.enemies[0].bleed).toBe(0);
+  });
+
+  it("sweep applies afflictions to EVERY enemy it touches", () => {
+    let s = afflictedRoom([{ key: "poison_on_hit", value: 2 }], [
+      { intent: "guard", hp: 50, maxHp: 50 },
+      { intent: "guard", hp: 50, maxHp: 50 },
+      { intent: "guard", hp: 50, maxHp: 50 },
+    ]);
+    s = applyAction(s, "sweep");
+    expect(s.enemies.map((e) => e.poison)).toEqual([2, 2, 2]);
+  });
+
+  it("stacks cap at STATUS.maxStacks", () => {
+    let s = afflictedRoom([{ key: "poison_on_hit", value: 4 }], [{ intent: "guard", hp: 200, maxHp: 200 }]);
+    s = applyAction(s, "attack");
+    s = applyAction(s, "attack");
+    s = applyAction(s, "attack"); // 12 would exceed the cap
+    expect(s.enemies[0].poison).toBeLessThanOrEqual(STATUS.maxStacks);
   });
 });

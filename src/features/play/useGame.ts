@@ -34,7 +34,7 @@ export interface UseGame {
 // changes — a stale or unparseable save is silently discarded, never migrated.
 // ---------------------------------------------------------------------------
 const SAVE_KEY = "hollow-descent-run";
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 3; // v3: enemy afflictions (Enemy.poison/bleed/sunder)
 
 function validSave(state: GameState | undefined | null): state is GameState {
   return Boolean(

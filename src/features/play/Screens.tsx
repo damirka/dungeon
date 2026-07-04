@@ -115,7 +115,7 @@ export function TitleScreen({
         </button>
       </div>
       <div className="font-term" style={{ color: "var(--ink-faint)", fontSize: 15 }}>
-        Keys 1–5 + R · E ends the turn · Enter descends · mouse works everywhere
+        Keys 1–6 + R · E ends the turn · Enter descends · mouse works everywhere
       </div>
       {padConnected && (
         <div className="font-term" style={{ color: "var(--heal)", fontSize: 14 }}>
@@ -157,6 +157,25 @@ export function downloadRunLog(state: GameState): void {
 export function EndScreen({ state, onRestart }: { state: GameState; onRestart: () => void }): JSX.Element {
   const win = state.phase === "won";
   const floor = state.stats.highestLevel;
+  // every foe put down this run: all enemies from cleared rooms, plus the ones
+  // dropped in the fatal fight when the run ended mid-room
+  const defeated = useMemo(() => {
+    const cleared = state.dungeon.slice(0, Math.min(state.roomIndex, state.dungeon.length)).flatMap((room) => room.enemies);
+    const inFatalRoom = win ? [] : state.enemies.filter((enemy) => enemy.hp <= 0);
+    return [...cleared, ...inFatalRoom];
+  }, [state, win]);
+  const bossesSlain = defeated.filter((enemy) => enemy.tags.includes("boss")).length;
+  const slainGroups = useMemo(() => {
+    const groups = new Map<string, { spriteId: string; name: string; boss: boolean; count: number }>();
+    for (const enemy of defeated) {
+      const key = enemy.spriteId || enemy.name;
+      const group = groups.get(key);
+      if (group) group.count += 1;
+      else groups.set(key, { spriteId: enemy.spriteId, name: enemy.name, boss: enemy.tags.includes("boss"), count: 1 });
+    }
+    // wardens first, then by kill count
+    return [...groups.values()].sort((a, b) => Number(b.boss) - Number(a.boss) || b.count - a.count);
+  }, [defeated]);
   return (
     <div className="hd-screen hd-crt">
       <Embers count={win ? 60 : 24} />
@@ -171,9 +190,26 @@ export function EndScreen({ state, onRestart }: { state: GameState; onRestart: (
       <div className="hd-screen-card hd-fade-in" style={{ minWidth: 320 }}>
         <div className="hd-kv"><span>Encounters cleared</span><b>{state.stats.roomsCleared}</b></div>
         <div className="hd-kv"><span>Deepest floor</span><b>{floor} / {state.stats.highestLevel >= 5 ? 5 : 5}</b></div>
+        <div className="hd-kv"><span>Foes slain</span><b>{defeated.length}</b></div>
+        <div className="hd-kv"><span>Wardens slain</span><b>{bossesSlain}</b></div>
         <div className="hd-kv"><span>Damage dealt</span><b>{humanDamage(state.stats.damageDealt)}</b></div>
         <div className="hd-kv"><span>Damage taken</span><b>{humanDamage(state.stats.damageTaken)}</b></div>
+        <div className="hd-kv"><span>Potions drunk</span><b>{state.player.consumed}</b></div>
       </div>
+      {slainGroups.length > 0 && (
+        <div className="hd-slain hd-fade-in">
+          <div className="hd-slain-title">{win ? "EVERY FOE PUT DOWN" : "SLAIN BEFORE YOU FELL"}</div>
+          <div className="hd-slain-row">
+            {slainGroups.map((group) => (
+              <span key={group.spriteId || group.name} className="hd-slain-chip" data-boss={group.boss} title={group.name}>
+                <SpriteActor id={group.spriteId} size={30} state="idle" phase={2} flip={false} />
+                {group.count > 1 && <b>×{group.count}</b>}
+                {group.boss && <b>☠</b>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <button type="button" className="hd-btn hd-btn--ember" style={{ fontSize: 14, padding: "16px 34px" }} onClick={onRestart}>
         ↺ DESCEND AGAIN
       </button>

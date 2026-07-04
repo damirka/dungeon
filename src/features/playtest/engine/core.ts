@@ -80,7 +80,43 @@ export const TACTICAL = {
   // the Heavy combo: a landed Heavy EXPOSES the target, and every later hit
   // you land this round takes the bonus — Heavy leads, others follow
   exposedBonusDamage: 3,
+  // DODGE: the DEX gamble. One roll for the whole enemy turn — succeed and
+  // EVERY attack whiffs (pierce and heavy included); FAIL and you are caught
+  // mid-step: every hit this round lands amplified. A true coin flip, not
+  // free mitigation — Guard stays the reliable tool.
+  dodgeStaminaCost: 1,
+  dodgeBaseChance: 0.3,
+  dodgeChancePerDexterity: 0.03, // per point above base dexterity
+  maxDodgeChance: 0.65,
+  dodgeFailDamageTakenMultiplier: 1.25,
 } as const;
+
+/**
+ * STATUS EFFECTS (2026-07-04, designer request): player-applied afflictions
+ * on enemies via on-hit gear. They tick OUTSIDE the block system (a poisoned
+ * foe rots behind its shield) and every damaging player hit applies them —
+ * including each cut of a Sweep, which is the multi-enemy affliction build.
+ * Enemy support HEALS also CLEANSE all statuses from their target, making
+ * healers priority kills for status builds.
+ *  - poison: N damage at the start of YOUR turn, then fades by 1
+ *  - bleed:  N damage right before the enemy acts, then fades by 1
+ *  - sunder: the enemy's telegraphed attacks deal N less (floor 1), fades 1/round
+ */
+export const STATUS = {
+  poisonDecayPerTick: 1,
+  bleedDecayPerTick: 1,
+  sunderDecayPerRound: 1,
+  /** Stack cap per status — keeps sweep-stacking a build, not an instakill. */
+  maxStacks: 9,
+} as const;
+
+export type StatusKey = "poison" | "bleed" | "sunder";
+
+export const STATUS_LABELS: Record<StatusKey, string> = {
+  poison: "Poison",
+  bleed: "Bleed",
+  sunder: "Sunder",
+};
 
 export const STATS = {
   baseHp: 30,
@@ -110,7 +146,9 @@ export const LOOT = {
   luckyPowerMultiplier: 1.45,
   jackpotOptionChance: 0.045,
   jackpotPowerMultiplier: 2.35,
-  uniqueOptionChance: 0.007,
+  // trimmed 0.007 -> 0.005 (2026-07-04): a designer run saw two uniques by F2
+  // and steamrolled — uniques should be a story, not an expectation
+  uniqueOptionChance: 0.005,
   uniquePowerMultiplier: 3.2,
   focusDraftChance: 0.3,
   earlyFocusDraftBonus: 0.18,
@@ -150,9 +188,9 @@ export const DUNGEON = {
 
 export const ENEMY_CURVE = {
   baseHp: 16,
-  hpGrowth: 1.44,
+  hpGrowth: 1.54,
   baseDamage: 4,
-  damageGrowth: 1.45,
+  damageGrowth: 1.54,
   bossHpMultiplier: 3.4,
   bossDamageMultiplier: 1.35,
   // the guaranteed mid-floor elite: a mini-boss at ~60% boss weight
@@ -308,9 +346,8 @@ export const ABILITY = {
   name: "Riposte",
   charges: 1,
   staminaCost: 2,
-  block: 3,
   counterMultiplier: 1,
-  role: "Perfect parry: +3 block, block is fully effective even vs Heavy, and counter EVERY attacker this turn.",
+  role: "Ultimate block: while armed, the biggest attack that comes is negated entirely and the attacker is countered.",
 } as const;
 
 export const CHARACTER = {
@@ -325,7 +362,7 @@ export const CHARACTER = {
 // Types
 // ----------------------------------------------------------------------------
 
-export type PlayerAction = "attack" | "heavy" | "sweep" | "bash" | "guard" | "ability" | "end";
+export type PlayerAction = "attack" | "heavy" | "sweep" | "bash" | "guard" | "dodge" | "ability" | "end";
 export type EnemyIntent = "strike" | "heavy" | "pierce" | "aim" | "guard" | "heal" | "shield";
 export type Phase = "title" | "intro" | "combat" | "loot" | "dead" | "won";
 
@@ -378,7 +415,10 @@ export type EffectKey =
   | "max_stamina" // +N max stamina per turn
   | "potion_boost" // potions restore +N more HP
   | "crit_chance" // +N crit chance (additive, e.g. 0.08)
-  | "crit_splash"; // on crit, every OTHER enemy takes N
+  | "crit_splash" // on crit, every OTHER enemy takes N
+  | "poison_on_hit" // every damaging hit adds N poison (ticks at your turn start)
+  | "bleed_on_hit" // every damaging hit adds N bleed (ticks before the enemy acts)
+  | "sunder_on_hit"; // every damaging hit adds N sunder (enemy attacks deal N less)
 
 export interface ItemEffect {
   key: EffectKey;
@@ -400,6 +440,9 @@ export const EFFECT_LABELS: Record<EffectKey, string> = {
   potion_boost: "Potion power",
   crit_chance: "Crit chance",
   crit_splash: "Crit splash",
+  poison_on_hit: "Poison on hit",
+  bleed_on_hit: "Bleed on hit",
+  sunder_on_hit: "Sunder on hit",
 };
 
 export type PlayerEffects = Partial<Record<EffectKey, number>>;
@@ -447,6 +490,12 @@ export interface Enemy {
   denied: boolean;
   steadied: boolean; // cannot be denied again until it completes an action
   exposed: boolean; // hit by Heavy this round: later hits gain bonus damage
+  /** Poison stacks: takes this much at the player's turn start, fades by 1. */
+  poison: number;
+  /** Bleed stacks: takes this much right before it acts, fades by 1. */
+  bleed: number;
+  /** Sunder stacks: its telegraphed attacks deal this much less, fades 1/round. */
+  sunder: number;
   /** Boss script offset — bumped each time a boss's intent is denied. */
   scriptShift?: number;
 }
@@ -480,6 +529,8 @@ export interface Player {
   guardFatigue: number;
   /** Transient: guarded at least once this round (feeds guardFatigue). */
   guardedThisRound: boolean;
+  /** Transient: committed to the dodge gamble this round. */
+  dodging: boolean;
   /** Aggregated gear effects (recomputed by recalculatePlayerFromGear). */
   effects: PlayerEffects;
   items: Item[];
@@ -501,7 +552,8 @@ export type FxEvent =
   | { type: "roomClear" }
   | { type: "playerDown" }
   | { type: "shake"; power: number }
-  | { type: "buff"; text: string }; // floating text over the hero (gear effects firing)
+  | { type: "buff"; text: string } // floating text over the hero (gear effects firing)
+  | { type: "status"; target: number; status: StatusKey; value: number }; // affliction applied/stacked on an enemy
 
 export interface GameState {
   phase: Phase;
@@ -606,6 +658,7 @@ function announceEffect(s: GameState, text: string): void {
 function actionLogName(action: PlayerAction): string {
   if (action === "ability") return CHARACTER.ability.name;
   if (action === "bash") return "Bash";
+  if (action === "dodge") return "Dodge";
   return action;
 }
 
@@ -708,6 +761,9 @@ function makeEnemy(level: number, key: ArchetypeKey, isBoss: boolean, variant = 
     denied: false,
     steadied: false,
     exposed: false,
+    poison: 0,
+    bleed: 0,
+    sunder: 0,
   };
 }
 
@@ -745,6 +801,9 @@ function scaleEnemy(enemy: Enemy, hpFactor: number, damageFactor: number, tags: 
     denied: false,
     steadied: false,
     exposed: false,
+    poison: 0,
+    bleed: 0,
+    sunder: 0,
   };
 }
 
@@ -896,6 +955,12 @@ export function playerCritMultiplier(p: Player): number {
   return COMBAT.critMultiplier + (p.weapon.critMultiplierBonus || 0);
 }
 
+/** Chance the dodge gamble pays off: DEX-scaled, hard-capped. */
+export function playerDodgeChance(p: Player): number {
+  const dexBonus = TACTICAL.dodgeChancePerDexterity * Math.max(0, p.dexterity - STATS.baseDexterity);
+  return Math.min(TACTICAL.maxDodgeChance, TACTICAL.dodgeBaseChance + dexBonus);
+}
+
 export function guardBlockAmount(p: Player): number {
   const dexBonus = Math.floor(Math.max(0, p.dexterity - STATS.baseDexterity) / COMBAT.guardDexterityStep);
   const full = COMBAT.guardBaseBlock + dexBonus + p.blockBonus + (p.weapon.blockBonus || 0);
@@ -945,7 +1010,9 @@ export function enemyIntentDamage(enemy: Enemy, intent: EnemyIntent = enemy.inte
   let damage = enemy.damage * (map[intent] || 0);
   if (damage <= 0) return 0;
   if (enemy.aimed) damage *= TACTICAL.aimedDamageMultiplier;
-  return Math.max(1, Math.round(damage));
+  // sunder saps the blow (the telegraph stays exact — it shows the sapped
+  // number); attacks always sting for at least 1
+  return Math.max(1, Math.round(damage) - Math.round(enemy.sunder || 0));
 }
 
 function setEnemyIntent(enemy: Enemy, intent: EnemyIntent): void {
@@ -974,11 +1041,12 @@ export function expectedPlayerDamage(s: GameState, enemy: Enemy, action: PlayerA
 export function expectedIncomingDamage(s: GameState, extraBlock = 0): number {
   let blockPool = Math.max(0, (s.player.block || 0) + extraBlock);
   const blockStopsPierce = (s.player.effects.guard_pierce_block || 0) > 0;
-  // gear OR an armed Riposte (perfect parry) makes block fully effective vs heavy
-  const blockStopsHeavy = (s.player.effects.guard_heavy_block || 0) > 0 || s.riposteArmed;
+  const blockStopsHeavy = (s.player.effects.guard_heavy_block || 0) > 0;
+  const parryIndex = s.riposteArmed ? riposteParryIndex(s) : -1;
   let total = 0;
-  for (const enemy of s.enemies) {
+  for (const [index, enemy] of s.enemies.entries()) {
     if (enemy.hp <= 0 || enemy.denied) continue;
+    if (index === parryIndex) continue; // the armed Riposte eats this one whole
     const damage = enemy.intentDamage;
     if (damage <= 0) continue;
     if (enemy.intent === "pierce" && !blockStopsPierce) {
@@ -999,6 +1067,22 @@ export function expectedIncomingDamage(s: GameState, extraBlock = 0): number {
   return total;
 }
 
+/**
+ * Which enemy's attack an armed Riposte will negate: the single biggest
+ * telegraphed hit that will actually resolve this round (-1 if none).
+ */
+export function riposteParryIndex(s: GameState): number {
+  let best = 0;
+  let parryIndex = -1;
+  s.enemies.forEach((enemy, index) => {
+    if (enemy.hp <= 0 || enemy.denied) return;
+    if ((enemy.intentDamage || 0) <= best) return;
+    best = enemy.intentDamage;
+    parryIndex = index;
+  });
+  return parryIndex;
+}
+
 // ----------------------------------------------------------------------------
 // Intent selection
 // ----------------------------------------------------------------------------
@@ -1010,7 +1094,13 @@ function indexPriority(index: number, casterIndex: number): number {
 function supportHealTarget(enemies: Enemy[], casterIndex: number): number | null {
   const candidates = enemies
     .map((enemy, index) => ({ enemy, index }))
-    .filter(({ enemy, index }) => index !== casterIndex && enemy.hp > 0 && enemy.hp < enemy.maxHp * TACTICAL.supportHealThreshold);
+    .filter(
+      ({ enemy, index }) =>
+        index !== casterIndex &&
+        enemy.hp > 0 &&
+        // hurt allies OR afflicted ones — a heal doubles as a cleanse
+        (enemy.hp < enemy.maxHp * TACTICAL.supportHealThreshold || (enemy.poison || 0) + (enemy.bleed || 0) + (enemy.sunder || 0) > 0)
+    );
   if (!candidates.length) return null;
   return candidates.reduce((best, current) => (current.enemy.maxHp - current.enemy.hp > best.enemy.maxHp - best.enemy.hp ? current : best)).index;
 }
@@ -1111,6 +1201,7 @@ export function actionStaminaCost(action: PlayerAction): number {
   if (action === "sweep") return TACTICAL.sweepStaminaCost;
   if (action === "bash") return TACTICAL.bashStaminaCost;
   if (action === "guard") return TACTICAL.guardStaminaCost;
+  if (action === "dodge") return TACTICAL.dodgeStaminaCost;
   if (action === "ability") return CHARACTER.ability.staminaCost;
   return TACTICAL.endStaminaCost;
 }
@@ -1163,6 +1254,49 @@ function denyEnemy(s: GameState, enemyIndex: number, source: string): boolean {
   return true;
 }
 
+/**
+ * On-hit afflictions from gear: every damaging player hit stacks them —
+ * including each cut of a Sweep (the multi-enemy affliction build). Statuses
+ * land THROUGH block (the shield does not stop the venom on the blade).
+ */
+function applyOnHitStatuses(s: GameState, enemyIndex: number): void {
+  const enemy = s.enemies[enemyIndex];
+  if (!enemy || enemy.hp <= 0) return;
+  const apply = (key: EffectKey, status: StatusKey) => {
+    const value = Math.round(effectValue(s.player, key));
+    if (value <= 0) return;
+    const before = enemy[status];
+    enemy[status] = Math.min(STATUS.maxStacks, enemy[status] + value);
+    if (enemy[status] === before) return; // capped — nothing new landed
+    fireEffect(s, key);
+    if (status === "sunder") setEnemyIntent(enemy, enemy.intent); // telegraph drops NOW
+    log(s, `${enemy.name} suffers ${STATUS_LABELS[status]} ${enemy[status]}.`, "good");
+    s.fx.push({ type: "status", target: enemyIndex, status, value: enemy[status] });
+  };
+  apply("poison_on_hit", "poison");
+  apply("bleed_on_hit", "bleed");
+  apply("sunder_on_hit", "sunder");
+}
+
+/** A status tick damages PAST block — returns true if it killed the enemy. */
+function tickStatus(s: GameState, enemyIndex: number, status: StatusKey, decay: number): boolean {
+  const enemy = s.enemies[enemyIndex];
+  const stacks = enemy[status];
+  if (enemy.hp <= 0 || stacks <= 0) return false;
+  enemy.hp = Math.max(0, enemy.hp - stacks);
+  s.stats.damageDealt += stacks;
+  log(s, `${enemy.name} takes ${stacks} ${STATUS_LABELS[status].toLowerCase()}.`, "good");
+  s.fx.push({ type: "strike", from: "player", target: enemyIndex, hit: true, crit: false, damage: stacks, label: STATUS_LABELS[status] });
+  enemy[status] = Math.max(0, stacks - decay);
+  if (enemy.hp <= 0) {
+    // DoT kills clear the room like any other, but deliberately do NOT proc
+    // on-kill gear (no heal/stamina from a foe you never touched this round)
+    s.fx.push({ type: "enemyDown", index: enemyIndex });
+    return true;
+  }
+  return false;
+}
+
 function resolveStrike(s: GameState, enemyIndex: number, action: PlayerAction, label: string | null = null): number {
   const p = s.player;
   const enemy = s.enemies[enemyIndex];
@@ -1183,6 +1317,8 @@ function resolveStrike(s: GameState, enemyIndex: number, action: PlayerAction, l
   log(s, `${actionName} hit ${enemy.name} for ${humanDamage(dealt)}${crit ? " — crit!" : ""}${blockText}${nowExposed ? " · EXPOSED" : ""}`);
   s.fx.push({ type: "strike", from: "player", target: enemyIndex, hit: true, crit, damage: dealt, label: actionName });
   s.stats.damageDealt += dealt;
+  // afflictions ride on EVERY hit — even a fully-blocked one (venom on the blade)
+  applyOnHitStatuses(s, enemyIndex);
   // crit splash needs someone to splash onto — never fire/log in solo fights
   if (crit && effectValue(p, "crit_splash") > 0 && s.enemies.some((other, i) => i !== enemyIndex && other.hp > 0)) {
     const splash = Math.round(effectValue(p, "crit_splash"));
@@ -1233,8 +1369,19 @@ function resolveBash(s: GameState, enemyIndex: number): void {
 
 function resolveEnemies(s: GameState): void {
   expireEnemyBlocks(s);
-  // Riposte counters EVERY attacker this turn (it is a once-per-room premium)
-  const riposteArmed = s.riposteArmed;
+  // BLEED ticks first — right before the enemy turn. A bleeding foe can die
+  // before it ever gets to act (that is the point of the affliction).
+  s.enemies.forEach((_, index) => tickStatus(s, index, "bleed", STATUS.bleedDecayPerTick));
+  // an armed Riposte is the ultimate block: it fully negates the single
+  // biggest attack that resolves this turn and counters that attacker
+  const parryIndex = s.riposteArmed ? riposteParryIndex(s) : -1;
+  // Dodge is ONE roll for the whole enemy turn: slip everything, or get
+  // caught mid-step and eat every hit amplified
+  const dodged = s.player.dodging && Math.random() < playerDodgeChance(s.player);
+  const dodgeFailed = s.player.dodging && !dodged;
+  if (s.player.dodging) {
+    log(s, dodged ? "You read every swing — untouchable this round!" : "Your dodge fails — caught mid-step, every hit lands harder.", dodged ? "good" : "bad");
+  }
   s.enemies.forEach((enemy, index) => {
     if (enemy.hp <= 0) return;
     if (enemy.denied) {
@@ -1265,6 +1412,15 @@ function resolveEnemies(s: GameState): void {
         target.hp = Math.min(target.maxHp, target.hp + amount);
         log(s, `${enemy.name} healed ${target.name} for ${humanHp(target.hp - before)}.`, "warn");
         s.fx.push({ type: "support", kind: "heal", from: index, target: targetIndex });
+        // healing also CLEANSES: every affliction is purged — status builds
+        // must kill the healer first
+        if ((target.poison || 0) + (target.bleed || 0) + (target.sunder || 0) > 0) {
+          target.poison = 0;
+          target.bleed = 0;
+          target.sunder = 0;
+          setEnemyIntent(target, target.intent); // its sapped telegraph recovers
+          log(s, `${enemy.name}'s healing cleanses ${target.name} — every affliction removed.`, "warn");
+        }
       }
       enemy.steadied = false;
       return;
@@ -1285,12 +1441,28 @@ function resolveEnemies(s: GameState): void {
     }
     // attack intents: the telegraphed number lands, block absorbs — but pierce
     // ignores block and heavy CRUSHES it (half efficiency), unless gear says otherwise
-    const damage = enemy.intentDamage;
+    const damage = dodgeFailed ? Math.round(enemy.intentDamage * TACTICAL.dodgeFailDamageTakenMultiplier) : enemy.intentDamage;
+    if (index === parryIndex) {
+      // Riposte fires: the promised negation — the whole attack turns aside
+      s.riposteArmed = false;
+      enemy.aimed = false;
+      enemy.steadied = false;
+      log(s, `Riposte! ${enemy.name}'s ${enemy.intent} (${humanDamage(damage)}) is negated entirely.`, "good");
+      s.fx.push({ type: "strike", from: index, target: "player", hit: false, crit: false, damage: 0, label: "parried" });
+      if (s.player.hp > 0 && enemy.hp > 0) resolveStrike(s, index, "ability", "Riposte");
+      return;
+    }
+    if (dodged) {
+      enemy.aimed = false;
+      enemy.steadied = false;
+      log(s, `${enemy.name}'s ${enemy.intent} whiffs — dodged.`, "good");
+      s.fx.push({ type: "strike", from: index, target: "player", hit: false, crit: false, damage: 0, label: "dodged" });
+      return;
+    }
     let taken = damage;
     const blockWorks = enemy.intent !== "pierce" || effectValue(s.player, "guard_pierce_block") > 0;
     if (blockWorks) {
-      // Riposte armed = perfect parry: the stance catches even crushing blows
-      const heavyCrushes = enemy.intent === "heavy" && effectValue(s.player, "guard_heavy_block") <= 0 && !s.riposteArmed;
+      const heavyCrushes = enemy.intent === "heavy" && effectValue(s.player, "guard_heavy_block") <= 0;
       if (heavyCrushes) {
         const absorbed = Math.min(Math.floor(s.player.block * TACTICAL.heavyBlockEfficiency), damage);
         s.player.block = Math.max(0, s.player.block - absorbed * 2);
@@ -1318,10 +1490,8 @@ function resolveEnemies(s: GameState): void {
       log(s, `${enemy.name} takes ${thorns} thorns.`, "good");
       s.fx.push({ type: "strike", from: "player", target: index, hit: true, crit: false, damage: thorns, label: "Thorns" });
     }
-    if (riposteArmed && s.player.hp > 0 && enemy.hp > 0) {
-      resolveStrike(s, index, "ability", "Riposte");
-    }
   });
+  s.player.dodging = false; // the gamble covers exactly one enemy turn
 }
 
 // Training growth + recalc
@@ -1405,6 +1575,7 @@ export function startRoom(s: GameState): void {
   s.player.bashCharges = TACTICAL.bashChargesPerRoom;
   s.player.guardFatigue = 0;
   s.player.guardedThisRound = false;
+  s.player.dodging = false;
   s.riposteArmed = false;
   s.enemies = room.enemies.map((enemy) => ({
     ...enemy,
@@ -1417,6 +1588,9 @@ export function startRoom(s: GameState): void {
     denied: false,
     steadied: false,
     exposed: false,
+    poison: 0,
+    bleed: 0,
+    sunder: 0,
   }));
   s.enemies.forEach((enemy, index) => {
     setEnemyIntent(enemy, chooseIntent(enemy, 1, s.enemies, index));
@@ -1442,13 +1616,15 @@ export function startRoom(s: GameState): void {
     const bolt = Math.round(effectValue(p, "battle_start_bolt"));
     s.enemies.forEach((enemy, index) => {
       if (enemy.hp <= 0) return;
-      applyDamageToEnemy(enemy, bolt);
-      s.stats.damageDealt += bolt;
-      s.fx.push({ type: "strike", from: "player", target: index, hit: true, crit: false, damage: bolt, label: "Opening bolt" });
-      if (enemy.hp <= 0) s.fx.push({ type: "enemyDown", index });
+      // the opening bolt SOFTENS, it never kills: fights are fought, not
+      // pre-cleared by a passive (enemies always survive it at 1 HP minimum)
+      const dealt = Math.min(bolt, Math.max(0, enemy.hp - 1));
+      if (dealt <= 0) return;
+      enemy.hp -= dealt;
+      s.stats.damageDealt += dealt;
+      s.fx.push({ type: "strike", from: "player", target: index, hit: true, crit: false, damage: dealt, label: "Opening bolt" });
     });
     announceEffect(s, `OPENING BOLT ${bolt} — hits every foe`);
-    if (s.enemies.every((enemy) => enemy.hp <= 0)) clearRoom(s);
   }
 }
 
@@ -1516,7 +1692,8 @@ function endPlayerTurn(s: GameState, prev: GameState): void {
   }
   s.player.stamina = s.player.maxStamina;
   s.player.block = 0;
-  s.riposteArmed = false;
+  // note: riposteArmed persists across rounds — the stance holds until an
+  // attack actually comes (it fires at most once per encounter regardless)
   // guard fatigue: consecutive guarding rounds tire the arm; a round without
   // guarding resets it
   if (s.player.guardedThisRound) s.player.guardFatigue = (s.player.guardFatigue || 0) + 1;
@@ -1525,11 +1702,17 @@ function endPlayerTurn(s: GameState, prev: GameState): void {
   s.enemies.forEach((enemy, index) => {
     if (enemy.hp <= 0) return;
     enemy.exposed = false; // the Heavy combo window closes with the round
+    // sunder fades one step per round — decay BEFORE the new telegraph so
+    // the number shown is the number that will land
+    enemy.sunder = Math.max(0, (enemy.sunder || 0) - STATUS.sunderDecayPerRound);
     // a denied enemy re-rolls like everyone else — the stopped attack never
     // returns as-is (bosses roll their advanced script step)
     enemy.denied = false;
     setEnemyIntent(enemy, chooseIntent(enemy, s.round, s.enemies, index));
   });
+  // POISON ticks at the start of YOUR turn — the rot works while you wind up
+  s.enemies.forEach((_, index) => tickStatus(s, index, "poison", STATUS.poisonDecayPerTick));
+  if (s.enemies.every((enemy) => enemy.hp <= 0)) clearRoom(s);
 }
 
 /**
@@ -1553,6 +1736,10 @@ export function applyAction(prev: GameState, action: PlayerAction): GameState {
   }
   if (action === "ability" && s.riposteArmed) {
     log(s, "Riposte is already armed.", "warn");
+    return s;
+  }
+  if (action === "dodge" && s.player.dodging) {
+    log(s, "You are already set to dodge this round.", "warn");
     return s;
   }
   if (!canAffordAction(s.player, action)) {
@@ -1579,8 +1766,10 @@ export function applyAction(prev: GameState, action: PlayerAction): GameState {
   } else if (action === "ability") {
     s.player.abilityCharges = Math.max(0, (s.player.abilityCharges || 0) - 1);
     s.riposteArmed = true;
-    s.player.block += CHARACTER.ability.block;
-    log(s, `${CHARACTER.ability.name}: +${CHARACTER.ability.block} block, counter the first attacker.`, "good");
+    log(s, `${CHARACTER.ability.name} armed: the biggest attack that comes will be negated and countered.`, "good");
+  } else if (action === "dodge") {
+    s.player.dodging = true;
+    log(s, `You coil to dodge — ${humanChance(playerDodgeChance(s.player))} to slip every attack this round.`, "good");
   } else {
     let targetIndex = s.selected;
     if (!s.enemies[targetIndex] || s.enemies[targetIndex].hp <= 0) {
@@ -1736,6 +1925,7 @@ export function newGame(plan?: DungeonPlan | null): GameState {
       bashCharges: TACTICAL.bashChargesPerRoom,
       guardFatigue: 0,
       guardedThisRound: false,
+      dodging: false,
       effects: {},
       items: [],
       stash: [],
@@ -1751,7 +1941,7 @@ export function newGame(plan?: DungeonPlan | null): GameState {
     fx: [],
     dungeon,
     stats: {
-      actions: { attack: 0, heavy: 0, sweep: 0, bash: 0, guard: 0, ability: 0, end: 0 },
+      actions: { attack: 0, heavy: 0, sweep: 0, bash: 0, guard: 0, dodge: 0, ability: 0, end: 0 },
       damageDealt: 0,
       damageTaken: 0,
       roomsCleared: 0,

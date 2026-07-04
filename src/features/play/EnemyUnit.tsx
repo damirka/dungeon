@@ -1,7 +1,13 @@
 import type { JSX } from "react";
 import { SpriteActor, type ActorState } from "./SpriteActor";
-import { humanHp, type Enemy } from "../playtest/engine";
-import { IntentIcon } from "./icons";
+import { humanHp, type Enemy, type StatusKey } from "../playtest/engine";
+import { IntentIcon, StatusIcon } from "./icons";
+
+const STATUS_TITLE: Record<StatusKey, (n: number) => string> = {
+  poison: (n) => `Poison ${n} — takes ${n} damage at the start of YOUR turn (ignores block), then fades by 1`,
+  bleed: (n) => `Bleed ${n} — takes ${n} damage right before it acts (ignores block), then fades by 1`,
+  sunder: (n) => `Sunder ${n} — its attacks deal ${n} less damage; fades by 1 each round`,
+};
 
 const INTENT_LABEL: Record<string, string> = {
   strike: "Strike",
@@ -62,7 +68,7 @@ export function EnemyUnit({
       ref={(el) => registerEl(index, el)}
       onClick={() => !dead && onSelect(index)}
       role="button"
-      aria-label={`${enemy.name}, ${humanHp(enemy.hp)} of ${humanHp(enemy.maxHp)} HP, next: ${intentLabel} ${enemy.intentDamage || ""}`}
+      aria-label={`${enemy.name}, ${humanHp(enemy.hp)} of ${humanHp(enemy.maxHp)} HP, next: ${intentLabel} ${enemy.intentDamage || ""}${(enemy.poison || 0) > 0 ? `, poison ${enemy.poison}` : ""}${(enemy.bleed || 0) > 0 ? `, bleed ${enemy.bleed}` : ""}${(enemy.sunder || 0) > 0 ? `, sunder ${enemy.sunder}` : ""}`}
     >
       {!dead && (
         <div
@@ -105,6 +111,18 @@ export function EnemyUnit({
             {humanHp(enemy.hp)}/{humanHp(enemy.maxHp)}
             {preview > 0 && <b className="hd-plate-hp-preview"> −{humanHp(preview)}{lethal ? " ☠" : ""}</b>}
           </div>
+          {((enemy.poison || 0) > 0 || (enemy.bleed || 0) > 0 || (enemy.sunder || 0) > 0) && (
+            <div className="hd-status-row" aria-label="Afflictions">
+              {(["poison", "bleed", "sunder"] as StatusKey[]).map((status) =>
+                (enemy[status] || 0) > 0 ? (
+                  <span key={status} className="hd-affliction" data-k={status} title={STATUS_TITLE[status](enemy[status])}>
+                    <StatusIcon status={status} size={11} />
+                    {enemy[status]}
+                  </span>
+                ) : null
+              )}
+            </div>
+          )}
           {(isElite || enemy.block > 0 || enemy.denied || enemy.steadied || enemy.aimed || enemy.exposed) && (
             <div className="hd-status-row">
               {isElite && <span className="hd-status" data-k="sunder">ELITE</span>}

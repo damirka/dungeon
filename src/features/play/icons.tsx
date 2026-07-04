@@ -1,6 +1,6 @@
-/** Crisp inline icons for actions, enemy intents, and loot. currentColor-driven. */
+/** Crisp inline icons for actions, enemy intents, statuses, and loot. currentColor-driven. */
 import type { JSX } from "react";
-import type { EnemyIntent, PlayerAction } from "../playtest/engine";
+import type { EnemyIntent, PlayerAction, StatusKey } from "../playtest/engine";
 
 interface IconProps {
   size?: number;
@@ -57,6 +57,13 @@ export function ActionIcon({ action, size }: { action: PlayerAction; size?: numb
           <path d="M12 3 L20 6 V12 a8 9 0 0 1 -8 9 a8 9 0 0 1 -8 -9 V6 Z" />
         </Svg>
       );
+    case "dodge":
+      return (
+        <Svg size={size}>
+          <path d="M4 7 C10 7 13 11 20 11 M20 11 L16 7 M20 11 L16 15" />
+          <path d="M4 17 C7 17 9 15.5 11 14" />
+        </Svg>
+      );
     case "ability":
       return (
         <Svg size={size}>
@@ -66,6 +73,36 @@ export function ActionIcon({ action, size }: { action: PlayerAction; size?: numb
       );
     default:
       return <Svg size={size}><circle cx="12" cy="12" r="8" /></Svg>;
+  }
+}
+
+/** Affliction icons: poison = dripping droplet, bleed = slashed drop, sunder = cracked blade. */
+export function StatusIcon({ status, size = 12 }: { status: StatusKey; size?: number }): JSX.Element {
+  switch (status) {
+    case "poison":
+      return (
+        <Svg size={size}>
+          <path d="M12 3 C12 3 6 10 6 15 a6 6 0 0 0 12 0 C18 10 12 3 12 3 Z" />
+          <path d="M9.5 15 a2.5 2.5 0 0 0 2.5 2.5" />
+        </Svg>
+      );
+    case "bleed":
+      return (
+        <Svg size={size}>
+          <path d="M12 4 C12 4 7 10.5 7 15 a5 5 0 0 0 10 0 C17 10.5 12 4 12 4 Z" />
+          <path d="M8 8 L16 16" />
+        </Svg>
+      );
+    case "sunder":
+      return (
+        <Svg size={size}>
+          <path d="M14 4 L20 4 L20 10 L13 17" />
+          <path d="M9 13 L4 18 L6 20 L11 15" />
+          <path d="M12 10 L10 13 L13 13 L11 16" />
+        </Svg>
+      );
+    default:
+      return <Svg size={size}><circle cx="12" cy="12" r="7" /></Svg>;
   }
 }
 

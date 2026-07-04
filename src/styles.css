@@ -30,6 +30,10 @@
   --danger: #b3402c;
   --heal: #8aaf5a;
   --mana: #6f93b0;
+  /* afflictions (status effects on enemies) */
+  --status-poison: #6fbf3f;
+  --status-bleed: #e0453a;
+  --status-sunder: #7aa2f7;
   --gold: #f6c45c;
 
   --rar-common: #564b35;
@@ -602,6 +606,127 @@ textarea {
   background: repeating-linear-gradient(90deg, rgba(111, 147, 176, 0.85), rgba(111, 147, 176, 0.85) 3px, rgba(111, 147, 176, 0.4) 3px, rgba(111, 147, 176, 0.4) 6px);
 }
 
+/* in-arena hero plate: gold vitality, with the telegraphed enemy damage as a
+   red slice eaten from the current-HP edge */
+.hd-plate-hero {
+  width: clamp(88px, 12vw, 132px);
+  margin-top: 4px;
+  pointer-events: none;
+}
+.hd-hpbar-hero {
+  height: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.hd-hpbar-hero .hd-hpbar-fill {
+  background: linear-gradient(to right, var(--ember-deep), var(--ember-2));
+}
+.hd-hpbar-incoming {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: repeating-linear-gradient(45deg, #ff5a4a, #ff5a4a 3px, #6e120a 3px, #6e120a 6px);
+  animation: hd-preview-pulse 0.9s ease-in-out infinite;
+}
+.hd-plate-incoming {
+  color: #ff5a4a;
+}
+.hd-plate-safe {
+  color: var(--heal);
+}
+
+/* loot draft: the currently equipped item as a mini compare card */
+.hd-loot-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px 8px;
+  border: 1px dashed var(--rarity, var(--line-2));
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.42);
+  text-align: left;
+}
+.hd-loot-current[data-empty="true"] {
+  border-style: dotted;
+}
+.hd-loot-current-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+}
+.hd-loot-current-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.2;
+}
+.hd-loot-current-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hd-loot-current-val {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.hd-loot-current-delta {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.hd-loot-current-delta[data-tone="up"] { color: var(--heal); }
+.hd-loot-current-delta[data-tone="down"] { color: var(--danger); }
+.hd-loot-current-delta[data-tone="even"],
+.hd-loot-current-delta[data-tone="info"] { color: var(--ink-faint); }
+
+/* end screen: every foe put down this run */
+.hd-slain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 620px;
+}
+.hd-slain-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--ink-faint);
+}
+.hd-slain-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-height: 128px;
+  overflow: auto;
+  padding: 2px;
+}
+.hd-slain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.hd-slain-chip b {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+.hd-slain-chip[data-boss="true"] {
+  border-color: var(--ember-deep);
+  box-shadow: 0 0 10px rgba(227, 162, 58, 0.18);
+}
+
 .hd-intent {
   display: inline-flex;
   align-items: center;
@@ -655,6 +780,26 @@ textarea {
 }
 .hd-status[data-k="sunder"] { color: var(--ember-2); }
 .hd-status[data-k="shield"] { color: var(--mana); }
+
+/* affliction chips (poison/bleed/sunder) — icon + live stack count, sitting
+   right under the enemy HP bar so the DoT state reads at a glance */
+.hd-affliction {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.62);
+  border: 1px solid var(--line-2);
+}
+.hd-affliction[data-k="poison"] { color: var(--status-poison); border-color: rgba(111, 191, 63, 0.45); }
+.hd-affliction[data-k="bleed"] { color: var(--status-bleed); border-color: rgba(224, 69, 58, 0.45); }
+.hd-affliction[data-k="sunder"] { color: var(--status-sunder); border-color: rgba(122, 162, 247, 0.45); }
 
 /* ===========================================================================
    Sprites (Oryx sheet, transparent)
@@ -734,6 +879,9 @@ textarea {
 .hd-float[data-kind="heal"] { color: var(--heal); }
 .hd-float[data-kind="miss"] { color: var(--ink-faint); font-size: 20px; }
 .hd-float[data-kind="block"] { color: var(--mana); font-size: 20px; }
+.hd-float[data-kind="poison"] { color: var(--status-poison); font-size: 20px; text-shadow: 0 0 10px rgba(111, 191, 63, 0.5), 0 2px 4px #000; }
+.hd-float[data-kind="bleed"] { color: var(--status-bleed); font-size: 20px; text-shadow: 0 0 10px rgba(224, 69, 58, 0.5), 0 2px 4px #000; }
+.hd-float[data-kind="sunder"] { color: var(--status-sunder); font-size: 20px; text-shadow: 0 0 10px rgba(122, 162, 247, 0.5), 0 2px 4px #000; }
 @keyframes hd-float-up {
   0% { opacity: 0; transform: translate(-50%, -30%) scale(0.6); }
   16% { opacity: 1; transform: translate(-50%, -92%) scale(1.1); }

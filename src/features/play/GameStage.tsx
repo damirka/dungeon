@@ -19,6 +19,7 @@ import { ExploreView } from "./ExploreView";
 import { RoomBackdrop, computeBattleStage, pickRoom } from "./roomRender";
 import type { RoomDef } from "../../game/roomData";
 import { EnemyUnit } from "./EnemyUnit";
+import { HeroPlate } from "./HeroPlate";
 import { FXBurst } from "./FXBurst";
 import { Loadout } from "./Loadout";
 import { LootDraft } from "./LootDraft";
@@ -48,7 +49,7 @@ interface Floaty {
   id: number;
   x: number;
   y: number;
-  kind: "dmg" | "crit" | "incoming" | "heal" | "miss" | "block";
+  kind: "dmg" | "crit" | "incoming" | "heal" | "miss" | "block" | "poison" | "bleed" | "sunder";
   text: string;
 }
 interface FxItem {
@@ -65,6 +66,7 @@ const ACTION_SFX: Record<PlayerAction, Sfx> = {
   bash: "quick",
   sweep: "sweep",
   guard: "guard",
+  dodge: "quick",
   ability: "ability",
   end: "uiClick",
 };
@@ -364,6 +366,14 @@ export function GameStage(game: UseGame): JSX.Element {
           setShake("l");
           setHero("dead", 8000);
         });
+      } else if (ev.type === "status") {
+        // affliction landed — float it in the status colour over the victim
+        const d = playerDelay + 160;
+        lastDelay = Math.max(lastDelay, d);
+        schedule(d, () => {
+          const pos = measureEnemy(ev.target);
+          if (pos) spawnFloat(pos.x, pos.y - 8, ev.status, `${ev.status.toUpperCase()} ${ev.value}`);
+        });
       } else if (ev.type === "buff") {
         // gear effect fired — float it over the hero so passives are never silent
         const d = playerDelay + 140;
@@ -411,7 +421,7 @@ export function GameStage(game: UseGame): JSX.Element {
         return;
       }
       if (state.phase !== "combat" || busy || exploring || state.player.hp <= 0) return;
-      const map: Record<string, PlayerAction> = { "1": "attack", "2": "heavy", "3": "bash", "4": "sweep", "5": "guard", r: "ability", R: "ability", e: "end", E: "end", " ": "attack" };
+      const map: Record<string, PlayerAction> = { "1": "attack", "2": "heavy", "3": "bash", "4": "sweep", "5": "guard", "6": "dodge", r: "ability", R: "ability", e: "end", E: "end", " ": "attack" };
       const action = map[e.key];
       if (action) {
         e.preventDefault();
@@ -533,13 +543,14 @@ export function GameStage(game: UseGame): JSX.Element {
           <div className="hd-unit hd-unit-hero" ref={heroRef} style={{ left: heroPos.x, top: heroPos.y, zIndex: 10 + Math.round(heroPos.y) }}>
             <SpriteActor id={HERO_ID} size={heroSize} state={heroState} phase={3} flip />
             <div className="hd-hero-base" />
+            {(state.phase === "combat" || (state.phase === "dead" && busy)) && <HeroPlate state={state} previewAction={previewAction} />}
           </div>
           {state.enemies.map((enemy: Enemy, i: number) => {
             const cell = stage.enemyCells[i] ?? stage.enemyCells[stage.enemyCells.length - 1] ?? stage.heroCell;
             const p = stage.cellToScreen(cell.x, cell.y);
             const previewable = previewAction === "sweep" || (previewAction != null && i === state.selected);
             const previewDamage =
-              state.phase === "combat" && enemy.hp > 0 && previewable && previewAction !== "guard" && previewAction !== "end"
+              state.phase === "combat" && enemy.hp > 0 && previewable && previewAction !== "guard" && previewAction !== "dodge" && previewAction !== "end"
                 ? Math.max(0, actionDamage(state, enemy, previewAction!) - (enemy.block || 0))
                 : null;
             return (
@@ -621,7 +632,8 @@ export function GameStage(game: UseGame): JSX.Element {
         )}
 
         {state.phase === "loot" && <LootDraft state={state} onPick={handlePickLoot} />}
-        {(state.phase === "dead" || state.phase === "won") && <EndScreen state={state} onRestart={restart} />}
+        {/* wait for the killing blow / final clear to animate (busy) before the overlay */}
+        {(state.phase === "dead" || state.phase === "won") && !busy && <EndScreen state={state} onRestart={restart} />}
       </div>
 
       {/* HUD */}

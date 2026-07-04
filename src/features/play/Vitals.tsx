@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { expectedIncomingDamage, guardBlockAmount, humanHp, humanStamina, humanStat, type GameState } from "../playtest/engine";
+import { expectedIncomingDamage, guardBlockAmount, humanChance, humanHp, humanStamina, humanStat, playerDodgeChance, type GameState } from "../playtest/engine";
 
 export function Vitals({ state }: { state: GameState }): JSX.Element {
   const p = state.player;
@@ -32,6 +32,16 @@ export function Vitals({ state }: { state: GameState }): JSX.Element {
           {p.block > 0 && (
             <span title="Block — absorbs incoming damage this turn" style={{ color: "var(--accent)" }}>
               🛡 <b>{humanStat(p.block)}</b>
+            </span>
+          )}
+          {p.dodging && (
+            <span title={`Dodging — ${humanChance(playerDodgeChance(p))} to slip every attack this round`} style={{ color: "var(--accent)" }}>
+              💨 <b>{humanChance(playerDodgeChance(p))}</b>
+            </span>
+          )}
+          {state.riposteArmed && (
+            <span title="Riposte armed — the biggest attack that comes will be negated and countered" style={{ color: "var(--accent)" }}>
+              ⛨ <b>PARRY</b>
             </span>
           )}
           {incoming > 0 && (

@@ -13,67 +13,68 @@
       "runs": 5000,
       "seed": 920000,
       "policy": "skilled",
-      "wins": 195,
-      "deaths": 4805,
+      "wins": 194,
+      "deaths": 4806,
       "timeouts": 0
     },
     "core_metrics": {
-      "win_rate": 0.039,
-      "avg_rooms_cleared": 28.1642,
-      "rooms_p50": 28,
+      "win_rate": 0.0388,
+      "avg_rooms_cleared": 28.8212,
+      "rooms_p50": 30,
       "rooms_p75": 31,
-      "rooms_p90": 34,
+      "rooms_p90": 35,
       "rooms_p95": 39,
       "rooms_p99": 40
     },
     "floor_reach_rates": {
-      "reach_l2_rate": 0.9982,
-      "reach_l3_rate": 0.9916,
-      "reach_l4_rate": 0.803,
-      "reach_l5_rate": 0.1088
+      "reach_l2_rate": 0.9998,
+      "reach_l3_rate": 0.9976,
+      "reach_l4_rate": 0.8238,
+      "reach_l5_rate": 0.2022
     },
     "boss_gates": {
-      "reach_l1_boss_rate": 0.9986,
-      "clear_l1_boss_rate": 0.9982,
-      "reach_l2_boss_rate": 0.9936,
-      "clear_l2_boss_rate": 0.9916,
-      "reach_l3_boss_rate": 0.863,
-      "clear_l3_boss_rate": 0.803,
-      "reach_l4_boss_rate": 0.4706,
-      "clear_l4_boss_rate": 0.1088,
-      "reach_l5_boss_rate": 0.0538,
-      "clear_l5_boss_rate": 0.039
+      "reach_l1_boss_rate": 0.9998,
+      "clear_l1_boss_rate": 0.9998,
+      "reach_l2_boss_rate": 0.9976,
+      "clear_l2_boss_rate": 0.9976,
+      "reach_l3_boss_rate": 0.8992,
+      "clear_l3_boss_rate": 0.8238,
+      "reach_l4_boss_rate": 0.4862,
+      "clear_l4_boss_rate": 0.2022,
+      "reach_l5_boss_rate": 0.0608,
+      "clear_l5_boss_rate": 0.0388
     },
     "conditional_boss_pass_rates": {
-      "l1_boss_clear_given_reached": 0.9995994392149008,
-      "l2_boss_clear_given_reached": 0.9979871175523349,
-      "l3_boss_clear_given_reached": 0.9304750869061414,
-      "l4_boss_clear_given_reached": 0.23119422014449637,
-      "l5_boss_clear_given_reached": 0.724907063197026
+      "l1_boss_clear_given_reached": 1,
+      "l2_boss_clear_given_reached": 1,
+      "l3_boss_clear_given_reached": 0.9161476868327402,
+      "l4_boss_clear_given_reached": 0.4158782394076511,
+      "l5_boss_clear_given_reached": 0.6381578947368421
     },
     "deaths_by_level": {
-      "L4": 3471,
-      "L3": 943,
-      "L5": 349,
-      "L2": 33,
-      "L1": 9
+      "L3": 869,
+      "L5": 817,
+      "L4": 3108,
+      "L2": 11,
+      "L1": 1
     },
     "deaths_by_room_kind": {
-      "encounter-elite": 2169,
-      "boss": 2195,
-      "encounter-P3": 126,
-      "encounter-P4": 131,
-      "encounter-P2": 95,
-      "encounter-P5": 67,
-      "encounter-P1": 22
+      "boss": 1907,
+      "encounter-elite": 1910,
+      "encounter-P2": 272,
+      "encounter-P4": 236,
+      "encounter-P3": 311,
+      "encounter-P5": 120,
+      "encounter-P1": 50
     },
     "action_counts": {
-      "attack": 327688,
-      "heavy": 186440,
-      "sweep": 217,
-      "bash": 74101,
-      "guard": 73198,
-      "ability": 23670,
+      "attack": 370093,
+      "heavy": 200907,
+      "sweep": 864,
+      "bash": 83977,
+      "guard": 76644,
+      "dodge": 14370,
+      "ability": 28958,
       "end": 0
     }
   },
@@ -88,11 +89,11 @@
     },
     "core_metrics": {
       "win_rate": 0,
-      "avg_rooms_cleared": 3.5365,
+      "avg_rooms_cleared": 3.3015,
       "rooms_p50": 3,
-      "rooms_p75": 4,
-      "rooms_p90": 6,
-      "rooms_p95": 7,
+      "rooms_p75": 3,
+      "rooms_p90": 5,
+      "rooms_p95": 6,
       "rooms_p99": 7
     },
     "floor_reach_rates": {
@@ -102,7 +103,7 @@
       "reach_l5_rate": 0
     },
     "boss_gates": {
-      "reach_l1_boss_rate": 0.0735,
+      "reach_l1_boss_rate": 0.0475,
       "clear_l1_boss_rate": 0.0035,
       "reach_l2_boss_rate": 0,
       "clear_l2_boss_rate": 0,
@@ -114,7 +115,7 @@
       "clear_l5_boss_rate": 0
     },
     "conditional_boss_pass_rates": {
-      "l1_boss_clear_given_reached": 0.04761904761904762,
+      "l1_boss_clear_given_reached": 0.0736842105263158,
       "l2_boss_clear_given_reached": 0,
       "l3_boss_clear_given_reached": 0,
       "l4_boss_clear_given_reached": 0,
@@ -125,20 +126,21 @@
       "L2": 7
     },
     "deaths_by_room_kind": {
-      "encounter-elite": 1268,
-      "encounter-P1": 100,
-      "encounter-P3": 400,
-      "encounter-P2": 92,
-      "boss": 140
+      "encounter-elite": 1231,
+      "encounter-P1": 155,
+      "encounter-P2": 142,
+      "boss": 88,
+      "encounter-P3": 384
     },
     "action_counts": {
-      "attack": 13039,
-      "heavy": 6795,
-      "sweep": 6849,
-      "bash": 6177,
-      "guard": 12934,
-      "ability": 4682,
-      "end": 13182
+      "attack": 11704,
+      "heavy": 6654,
+      "sweep": 6695,
+      "bash": 5989,
+      "guard": 11621,
+      "dodge": 10177,
+      "ability": 4485,
+      "end": 11923
     }
   },
   "weapon_lift_sample": {
