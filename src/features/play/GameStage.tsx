@@ -601,7 +601,7 @@ export function GameStage(game: UseGame): JSX.Element {
             room={stageRoom}
             locationName={BIOME_NAME[biome]}
             triggerRow={roomKind === "entrance" ? null : stage.heroCell.y}
-            hint={roomKind === "entrance" ? undefined : "Move with WASD / arrows — approach to engage"}
+            hint={roomKind === "entrance" ? undefined : "Move or tap — approach to engage"}
             onEnter={enterEncounter}
           />
         )}
@@ -636,8 +636,8 @@ export function GameStage(game: UseGame): JSX.Element {
         {(state.phase === "dead" || state.phase === "won") && !busy && <EndScreen state={state} onRestart={restart} />}
       </div>
 
-      {/* HUD */}
-      <div className="hd-hud">
+      {/* HUD — data-mode drives the mobile layout (actions pop up in combat only) */}
+      <div className="hd-hud" data-mode={exploring ? "explore" : state.phase}>
         <div className="hd-leftcol">
           <Vitals state={state} />
           <Loadout state={state} />

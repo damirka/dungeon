@@ -62,11 +62,14 @@ export function ExploreView({
     return s;
   }, [room, exit]);
 
-  // zoomed-in tile size — show roughly 8.5 rows / 10.5 cols of the map at once
+  // zoomed-in tile size — show roughly 8.5 rows / 10.5 cols of the map at once.
+  // Portrait (phones): bind to ~6.5 columns instead so the room fills the tall
+  // screen and the camera pans, rather than letterboxing a tiny map.
   const tile = useMemo(() => {
     const { w, h } = dims;
     if (!w || !h) return 0;
-    return Math.max(34, Math.round(Math.min(h / 8.5, w / 10.5)));
+    const cols = w < h ? 6.5 : 10.5;
+    return Math.max(34, Math.round(Math.min(h / 8.5, w / cols)));
   }, [dims]);
 
   const worldW = room.width * tile;
@@ -199,6 +202,39 @@ export function ExploreView({
     ),
   );
 
+  // touch: hold-to-repeat on-screen pad (shown on coarse pointers / phones via CSS)
+  const holdTimer = useRef(0);
+  const stopHold = useCallback(() => window.clearInterval(holdTimer.current), []);
+  const startHold = useCallback(
+    (dx: number, dy: number) => {
+      walkTarget.current = null;
+      stopHold();
+      move(dx, dy);
+      holdTimer.current = window.setInterval(() => move(dx, dy), 150);
+    },
+    [move, stopHold],
+  );
+  useEffect(() => stopHold, [stopHold]);
+
+  const padButton = (dx: number, dy: number, glyph: string, area: string) => (
+    <button
+      type="button"
+      className="hd-dpad-btn"
+      style={{ gridArea: area }}
+      aria-label={`Walk ${area}`}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        startHold(dx, dy);
+      }}
+      onPointerUp={stopHold}
+      onPointerLeave={stopHold}
+      onPointerCancel={stopHold}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {glyph}
+    </button>
+  );
+
   const heroSize = Math.round(tile * 0.8);
   const heroWX = (pos.x + 0.5) * tile;
   const heroWY = (pos.y + 0.5) * tile;
@@ -234,7 +270,23 @@ export function ExploreView({
       <div className="hd-explore-vignette" />
       <div className="hd-explore-hud">
         <div className="hd-explore-title">{kind === "entrance" ? `Floor ${level} — ${locationName}` : locationName}</div>
-        <div className="hd-explore-hint">{hint || "WASD / arrows, click a tile, or gamepad — step into the doorway to descend"}</div>
+        <div className="hd-explore-hint">{hint || "WASD / arrows, tap a tile, or gamepad — step into the doorway to descend"}</div>
+      </div>
+      {/* on-screen walk pad for touch play (CSS shows it on coarse pointers / phones) */}
+      <div className="hd-dpad">
+        {padButton(0, -1, "▲", "up")}
+        {padButton(-1, 0, "◀", "left")}
+        <button
+          type="button"
+          className="hd-dpad-btn hd-dpad-go"
+          style={{ gridArea: "mid" }}
+          aria-label="Enter"
+          onClick={enter}
+        >
+          ➤
+        </button>
+        {padButton(1, 0, "▶", "right")}
+        {padButton(0, 1, "▼", "down")}
       </div>
     </div>
   );

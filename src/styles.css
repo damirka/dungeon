@@ -1728,3 +1728,164 @@ textarea {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ===========================================================================
+   Touch walk pad (explore view) — hidden for mouse/keyboard setups
+   =========================================================================== */
+.hd-dpad {
+  position: absolute;
+  right: 14px;
+  bottom: 18px;
+  z-index: 6;
+  display: none;
+  grid-template-areas:
+    ". up ."
+    "left mid right"
+    ". down .";
+  gap: 6px;
+  touch-action: none;
+}
+.hd-dpad-btn {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  color: var(--ink-dim);
+  background: rgba(10, 8, 5, 0.72);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.hd-dpad-btn:active {
+  color: var(--on-ember);
+  background: var(--ember);
+  border-color: var(--ember-deep);
+}
+.hd-dpad-go {
+  color: var(--ember-2);
+  border-color: var(--ember-deep);
+  box-shadow: 0 0 14px var(--torch-glow);
+}
+@media (pointer: coarse), (max-width: 768px) {
+  .hd-dpad { display: grid; }
+}
+
+/* ===========================================================================
+   Phone layout — the game in one hand: stage on top, vitals strip, then the
+   combat actions popping up in the thumb zone. Studio panels (log, loadout)
+   step back; the arena hero plate carries the numbers.
+   =========================================================================== */
+@media (max-width: 768px) {
+  .hd-game,
+  .hd-screen {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* workbench rail becomes a slim top strip */
+  .hd-shell { flex-direction: column; }
+  .hd-rail {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .hd-rail-logo { width: 28px; height: 28px; margin: 0 6px 0 0; }
+  .hd-rail-logo svg { width: 22px; height: 22px; }
+  .hd-rail-btn { width: auto; flex-direction: row; gap: 5px; padding: 6px 9px; }
+  .hd-rail-btn span { font-size: 11px; }
+  .hd-rail > div[style] { margin-top: 0 !important; margin-left: auto; }
+
+  /* top bar: tighter, drop the subtitle, nodes scroll instead of clipping */
+  .hd-topbar { padding: 6px 8px; gap: 8px; }
+  .hd-topbar-biome { font-size: 12px; }
+  .hd-topbar-biome small { display: none; }
+  .hd-rooms { justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+  .hd-rooms::-webkit-scrollbar { display: none; }
+  .hd-node { width: 20px; height: 20px; font-size: 10px; border-radius: 6px; }
+  .hd-node-link { width: 7px; }
+  .hd-toggle { padding: 5px 8px; font-size: 12px; }
+  .hd-toggle[title="Download run log"] { display: none; }
+
+  /* HUD: a compact dock — vitals strip above the action grid */
+  .hd-hud {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    gap: 6px;
+    padding: 6px 8px 8px;
+  }
+  .hd-log-wrap { display: none; }
+  .hd-loadout { display: none; }
+  .hd-vitals { padding: 6px 10px; }
+  .hd-bigbar { height: 12px; }
+  .hd-vital-num { font-size: 18px; }
+
+  /* combat actions pop up on the screen only when there is a fight to act in;
+     while exploring the whole dock steps aside for a full-screen map */
+  .hd-hud[data-mode="loot"] .hd-cardwrap { display: none; }
+  .hd-hud[data-mode="explore"] { display: none; }
+  /* keep the hint clear of the walk pad (bottom-right) */
+  .hd-explore-hud {
+    left: 12px;
+    right: auto;
+    transform: none;
+    align-items: flex-start;
+    text-align: left;
+    max-width: 55vw;
+  }
+  .hd-explore-title { font-size: 15px; }
+  .hd-explore-hint { font-size: 12px; }
+  .hd-cardwrap {
+    padding: 8px;
+    animation: hd-dock-pop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+  }
+  .hd-actions { flex-direction: column; gap: 6px; }
+  .hd-actions-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  /* End Turn becomes a full-width bar under the grid */
+  .hd-actions > .hd-action[data-kind="end"] {
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px;
+  }
+  .hd-actions > .hd-action[data-kind="end"] .hd-action-stats { display: inline-flex; }
+  .hd-action { min-height: 62px; padding: 7px 3px 6px; gap: 3px; }
+  .hd-action-key { display: none; }
+  .hd-action-stats { display: none; }
+  .hd-action-name { font-size: 10px; letter-spacing: 0.02em; }
+  .hd-action-mp { font-size: 8px; }
+  /* hover tooltips have no place on touch — they stick after a tap */
+  .hd-tip { display: none !important; }
+
+  /* loot draft: stacked, scrollable, full-width cards */
+  .hd-overlay { overflow-y: auto; padding: 14px 10px; justify-content: flex-start; }
+  .hd-overlay-title { font-size: 19px; }
+  .hd-overlay-sub { margin-top: -6px; font-size: 13px; }
+  .hd-loot-row { flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+  .hd-loot-card { width: min(340px, 90vw); min-height: 0; }
+
+  /* title / end screens */
+  .hd-logo { font-size: clamp(44px, 15vw, 72px); }
+  .hd-tagline { font-size: 14px; padding: 0 16px; }
+  .hd-screen-card { min-width: 0 !important; width: min(340px, 90vw); }
+  .hd-banner { font-size: clamp(22px, 7vw, 40px); padding: 0 12px; text-align: center; }
+}
+
+@keyframes hd-dock-pop {
+  from { transform: translateY(60px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
