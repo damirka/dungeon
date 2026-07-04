@@ -34,6 +34,12 @@ export const COMBAT = {
   strengthDamageStep: 2, // +1 damage per this many STR above base
   guardBaseBlock: 4,
   guardDexterityStep: 2, // +1 guard block per this many DEX above base
+  // GUARD FATIGUE: every consecutive round you guard after the first, guard
+  // grants this much less block (down to the floor). Resets after a round
+  // without guarding. Kills the guard-every-turn autopilot; burst-guarding a
+  // big telegraph stays full strength.
+  guardFatigueDecay: 3,
+  guardFatigueFloor: 2,
   maxCombatRounds: 200,
 } as const;
 
@@ -136,20 +142,22 @@ export const DUNGEON = {
   statBudgetGainGrowth: 1.08,
   postEncounterHealFraction: 0,
   postLevelHealFraction: 0,
-  // 0 = training/gear max-HP gains do NOT heal current HP (scarce-HP design)
-  currentHpFromMaxHpGainFraction: 0,
+  // Training/level-up max-HP gains ALSO heal current HP by the gained amount
+  // (designer reversal 2026-07-04, adopting playtester feedback — growth
+  // should feel like growth). Floor-transition/free regen remains off.
+  currentHpFromMaxHpGainFraction: 1,
 } as const;
 
 export const ENEMY_CURVE = {
   baseHp: 16,
   hpGrowth: 1.44,
   baseDamage: 4,
-  damageGrowth: 1.42,
-  bossHpMultiplier: 3.0,
-  bossDamageMultiplier: 1.2,
+  damageGrowth: 1.45,
+  bossHpMultiplier: 3.4,
+  bossDamageMultiplier: 1.35,
   // the guaranteed mid-floor elite: a mini-boss at ~60% boss weight
-  eliteHpMultiplier: 1.8,
-  eliteDamageMultiplier: 1.25,
+  eliteHpMultiplier: 1.9,
+  eliteDamageMultiplier: 1.3,
 } as const;
 
 export type ArchetypeKey = "raider" | "brute" | "duelist" | "stalker" | "mage";
@@ -435,9 +443,12 @@ export interface Enemy {
   intent: EnemyIntent;
   intentDamage: number; // exact telegraphed damage (0 for non-attacks)
   aimed: boolean; // next attack is boosted (set by resolving "aim")
-  denied: boolean; // its telegraphed action is delayed to next round
+  /** Legacy delay flag (kept for old saves); denial now re-rolls instead. */
+  denied: boolean;
   steadied: boolean; // cannot be denied again until it completes an action
   exposed: boolean; // hit by Heavy this round: later hits gain bonus damage
+  /** Boss script offset — bumped each time a boss's intent is denied. */
+  scriptShift?: number;
 }
 
 export interface Room {
@@ -465,6 +476,10 @@ export interface Player {
   abilityCharges: number;
   /** Bash uses left this encounter (see TACTICAL.bashChargesPerRoom). */
   bashCharges: number;
+  /** Consecutive rounds ended having guarded — each one tires the guard arm. */
+  guardFatigue: number;
+  /** Transient: guarded at least once this round (feeds guardFatigue). */
+  guardedThisRound: boolean;
   /** Aggregated gear effects (recomputed by recalculatePlayerFromGear). */
   effects: PlayerEffects;
   items: Item[];
@@ -883,7 +898,9 @@ export function playerCritMultiplier(p: Player): number {
 
 export function guardBlockAmount(p: Player): number {
   const dexBonus = Math.floor(Math.max(0, p.dexterity - STATS.baseDexterity) / COMBAT.guardDexterityStep);
-  return COMBAT.guardBaseBlock + dexBonus + p.blockBonus + (p.weapon.blockBonus || 0);
+  const full = COMBAT.guardBaseBlock + dexBonus + p.blockBonus + (p.weapon.blockBonus || 0);
+  const fatigued = full - (p.guardFatigue || 0) * COMBAT.guardFatigueDecay;
+  return Math.max(COMBAT.guardFatigueFloor, fatigued);
 }
 
 function sweepDexterityBonus(p: Player): number {
@@ -1042,7 +1059,9 @@ function chooseIntent(enemy: Enemy, round: number, allies: Enemy[], casterIndex:
 function chooseIntentRaw(enemy: Enemy, round: number, allies: Enemy[], casterIndex: number): EnemyIntent {
   const tags = new Set(enemy.tags);
   if (tags.has("boss")) {
-    return (["heavy", "strike", "pierce", "aim", "heavy", "strike"] as EnemyIntent[])[(round - 1) % 6];
+    // scriptShift advances when the boss is denied — a re-roll must never be a
+    // no-op against the round-indexed script
+    return (["heavy", "strike", "pierce", "aim", "heavy", "strike"] as EnemyIntent[])[(round - 1 + (enemy.scriptShift || 0)) % 6];
   }
   if (tags.has("mage-support")) {
     const candidates: { intent: EnemyIntent; weight: number }[] = [
@@ -1133,7 +1152,13 @@ function denyEnemy(s: GameState, enemyIndex: number, source: string): boolean {
   if (!enemy || enemy.hp <= 0 || enemy.denied || enemy.steadied) return false;
   enemy.denied = true;
   enemy.steadied = true;
-  log(s, `${enemy.name} is denied by ${source} — its action is delayed a turn.`, "good");
+  // Denial = skip THIS round, and the plan that comes back next round is a
+  // FRESH roll (bosses advance their script) — the denied heavy never returns
+  // as-is. Pure re-roll-acts-now was tested and collapsed the game (bash lost
+  // all mitigation value); pure delay set a "the same 26-damage heavy is back"
+  // trap. This hybrid keeps both halves honest.
+  if (enemy.tags.includes("boss")) enemy.scriptShift = (enemy.scriptShift || 0) + 1;
+  log(s, `${enemy.name} is denied by ${source} — its ${enemy.intent} is stopped; it will rethink.`, "good");
   s.fx.push({ type: "interrupt", index: enemyIndex });
   return true;
 }
@@ -1213,12 +1238,9 @@ function resolveEnemies(s: GameState): void {
   s.enemies.forEach((enemy, index) => {
     if (enemy.hp <= 0) return;
     if (enemy.denied) {
-      // Denial DELAYS, it does not cancel: the telegraphed intent carries over
-      // and lands next round. Otherwise alternating Bash deletes half a boss's
-      // script for 2 stamina — a degenerate free kill. `denied` stays set here
-      // so the intent-choice phase knows to keep the intent; steadied persists
-      // (the enemy has not completed an action yet).
-      log(s, `${enemy.name} reels — its ${enemy.intent} is delayed.`);
+      // denied: skips this round; the intent-refresh phase gives it a FRESH
+      // roll (steadied persists — it has not completed an action yet)
+      log(s, `${enemy.name} reels — its ${enemy.intent} is stopped.`);
       return;
     }
     if (enemy.intent === "aim") {
@@ -1381,6 +1403,8 @@ export function startRoom(s: GameState): void {
   s.player.block = 0;
   s.player.abilityCharges = CHARACTER.ability.charges;
   s.player.bashCharges = TACTICAL.bashChargesPerRoom;
+  s.player.guardFatigue = 0;
+  s.player.guardedThisRound = false;
   s.riposteArmed = false;
   s.enemies = room.enemies.map((enemy) => ({
     ...enemy,
@@ -1493,15 +1517,17 @@ function endPlayerTurn(s: GameState, prev: GameState): void {
   s.player.stamina = s.player.maxStamina;
   s.player.block = 0;
   s.riposteArmed = false;
+  // guard fatigue: consecutive guarding rounds tire the arm; a round without
+  // guarding resets it
+  if (s.player.guardedThisRound) s.player.guardFatigue = (s.player.guardFatigue || 0) + 1;
+  else s.player.guardFatigue = 0;
+  s.player.guardedThisRound = false;
   s.enemies.forEach((enemy, index) => {
     if (enemy.hp <= 0) return;
     enemy.exposed = false; // the Heavy combo window closes with the round
-    if (enemy.denied) {
-      // delayed action carries over: same intent, same telegraphed number
-      enemy.denied = false;
-      enemy.intentDamage = enemyIntentDamage(enemy, enemy.intent);
-      return;
-    }
+    // a denied enemy re-rolls like everyone else — the stopped attack never
+    // returns as-is (bosses roll their advanced script step)
+    enemy.denied = false;
     setEnemyIntent(enemy, chooseIntent(enemy, s.round, s.enemies, index));
   });
 }
@@ -1547,7 +1573,9 @@ export function applyAction(prev: GameState, action: PlayerAction): GameState {
   } else if (action === "guard") {
     const gained = guardBlockAmount(s.player);
     s.player.block += gained;
-    log(s, `Guard raised: +${gained} block (${s.player.block} total).`, "good");
+    s.player.guardedThisRound = true;
+    const tired = (s.player.guardFatigue || 0) > 0 ? " (arm tiring)" : "";
+    log(s, `Guard raised: +${gained} block (${s.player.block} total)${tired}.`, "good");
   } else if (action === "ability") {
     s.player.abilityCharges = Math.max(0, (s.player.abilityCharges || 0) - 1);
     s.riposteArmed = true;
@@ -1706,6 +1734,8 @@ export function newGame(plan?: DungeonPlan | null): GameState {
       weapon: { ...startingWeapon },
       abilityCharges: CHARACTER.ability.charges,
       bashCharges: TACTICAL.bashChargesPerRoom,
+      guardFatigue: 0,
+      guardedThisRound: false,
       effects: {},
       items: [],
       stash: [],

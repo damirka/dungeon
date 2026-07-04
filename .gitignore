@@ -8,3 +8,5 @@ node_modules/
 dist/
 .vite/
 coverage/
+.pnpm-store/
+.vercel/

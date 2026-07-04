@@ -992,8 +992,18 @@ textarea {
   color: var(--ink);
   letter-spacing: 0.02em;
 }
+.hd-battle-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4; /* above the room canvas, below the actors (z 5) */
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+}
+
 .hd-bigbar {
-  height: 16px;
+  height: 24px;
   background: #1c0f0a;
   border: 1px solid #000;
   border-radius: 5px;
@@ -1011,8 +1021,8 @@ textarea {
 }
 .hd-mana { display: flex; gap: 5px; }
 .hd-pip {
-  width: 13px;
-  height: 13px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: 1px solid #16222c;
   background: #0e1620;

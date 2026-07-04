@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import type { LucideIcon } from "lucide-react";
 
-export type WorkspaceId = "play" | "playtest" | "mappers" | "levels" | "dungeon";
+export type WorkspaceId = "play" | "mappers" | "levels" | "dungeon";
 
 export interface WorkspaceDefinition {
   id: WorkspaceId;

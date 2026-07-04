@@ -31,6 +31,15 @@ export function useApiStatus() {
   useEffect(() => {
     let cancelled = false;
 
+    // the mapper API only exists in the local Vite plugin — don't poll it from
+    // production (static) deploys
+    if (import.meta.env.PROD) {
+      setStatus({ state: "offline", label: "API offline" });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     fetchJson<ApiStatusPayload>("/api/status")
       .then((payload) => {
         if (!cancelled && payload.ok) {

@@ -208,6 +208,28 @@ export const skilledPolicy: SimPolicy = {
   },
 };
 
+/**
+ * The player-suggested principle under test: ALWAYS bash a live heavy
+ * telegraph (re-rolling it into hopefully something smaller), otherwise play
+ * the normal skilled policy.
+ */
+export const bashHeavyPolicy: SimPolicy = {
+  name: "bash-heavy",
+  chooseTarget: (s) => {
+    if (bashAvailable(s.player)) {
+      const heavyIndex = s.enemies.findIndex((enemy) => enemy.hp > 0 && enemy.intent === "heavy" && !enemy.steadied);
+      if (heavyIndex >= 0) return heavyIndex;
+    }
+    return chooseTargetIndex(s);
+  },
+  chooseAction: (s) => {
+    const target = s.enemies[s.selected];
+    if (target && target.hp > 0 && target.intent === "heavy" && !target.steadied && bashAvailable(s.player)) return "bash";
+    return chooseSimAction(s);
+  },
+  chooseLoot: skilledPolicy.chooseLoot,
+};
+
 const RANDOM_ACTIONS: PlayerAction[] = ["attack", "heavy", "sweep", "bash", "guard", "ability", "end"];
 
 export const randomPolicy: SimPolicy = {

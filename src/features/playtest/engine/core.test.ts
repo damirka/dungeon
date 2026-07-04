@@ -112,8 +112,8 @@ describe("balance constants contract", () => {
     expect(DUNGEON.encountersPerLevel).toBe(7);
     expect(ENEMY_CURVE.baseHp).toBe(16);
     expect(ENEMY_CURVE.baseDamage).toBe(4);
-    expect(ENEMY_CURVE.bossHpMultiplier).toBe(3.0);
-    expect(ENEMY_CURVE.bossDamageMultiplier).toBe(1.2);
+    expect(ENEMY_CURVE.bossHpMultiplier).toBe(3.4);
+    expect(ENEMY_CURVE.bossDamageMultiplier).toBe(1.35);
     expect(LOOT.wearableSlotLimit).toBe(6);
     expect(LOOT.stashSlotLimit).toBe(4);
   });
@@ -456,19 +456,32 @@ describe("bash denial", () => {
     return { ...base, enemies: [foe], selected: 0 };
   }
 
-  it("bash delays the telegraphed action: no damage this turn, intent carries over", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.4);
+  it("bash stops the attack THIS round and the next telegraph is a fresh roll", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.4); // baseline re-roll -> strike
     let s = duel();
+    s = { ...s, enemies: [withIntent(s.enemies[0], "heavy", { hp: 50, maxHp: 50 })] }; // Heavy 6 telegraphed
     s = applyAction(s, "bash");
     expect(s.enemies[0].denied).toBe(true);
     expect(s.enemies[0].steadied).toBe(true);
     expect(s.enemies[0].hp).toBe(48); // bash deals floor(4 * 0.5) = 2
     s = applyAction(s, "end");
-    expect(s.player.hp).toBe(30); // the strike did not land this turn
-    expect(s.enemies[0].denied).toBe(false);
-    expect(s.enemies[0].steadied).toBe(true); // still steadied until it acts
-    expect(s.enemies[0].intent).toBe("strike"); // delayed, NOT re-rolled
+    expect(s.player.hp).toBe(30); // the heavy never landed
+    expect(s.enemies[0].intent).toBe("strike"); // and it does NOT come back — fresh roll
     expect(s.enemies[0].intentDamage).toBe(4);
+  });
+
+  it("a denied boss advances its script — the stopped heavy never returns as-is", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.4);
+    const base = advanceRoom(beginRun(newGame()));
+    const bossSource = newGame().dungeon.find((r) => r.isBoss)!.enemies[0];
+    const boss = withIntent({ ...bossSource }, "heavy", { hp: 200, maxHp: 200 });
+    let s = { ...base, enemies: [boss], selected: 0 };
+    s = applyAction(s, "bash");
+    expect(s.enemies[0].scriptShift).toBe(1);
+    expect(s.enemies[0].denied).toBe(true);
+    s = applyAction(s, "end"); // boss skips; round 2 rolls script[(2-1+1)%6]
+    expect(s.player.hp).toBe(30);
+    expect(s.enemies[0].intent).toBe("pierce");
   });
 
   it("bash is charge-limited: the third bash in one fight is refused", () => {
@@ -487,29 +500,23 @@ describe("bash denial", () => {
     expect(s.log.some((entry) => entry.text.includes("No Bash charges"))).toBe(true);
   });
 
-  it("delay preserves the big telegraph — denying a Heavy does not erase it", () => {
+  it("a steadied target cannot be re-rolled: bash is damage only", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.4);
     let s = duel();
-    s = { ...s, enemies: [withIntent(s.enemies[0], "heavy", { hp: 50, maxHp: 50 })] };
-    expect(s.enemies[0].intentDamage).toBe(6);
-    s = applyAction(s, "bash"); // delay the Heavy 7
-    s = applyAction(s, "end"); // nothing lands this turn
-    expect(s.player.hp).toBe(30);
-    expect(s.enemies[0].intent).toBe("heavy"); // the same Heavy is still coming
-    s = applyAction(s, "end"); // and now it lands in full
-    expect(s.player.hp).toBe(24);
+    s = { ...s, enemies: [withIntent(s.enemies[0], "heavy", { hp: 50, maxHp: 50, steadied: true })] };
+    s = applyAction(s, "bash");
+    expect(s.enemies[0].intent).toBe("heavy"); // plan NOT re-rolled
+    expect(s.log.some((entry) => entry.text.includes("holds firm"))).toBe(true);
   });
 
-  it("a steadied enemy cannot be denied again (no stun-lock)", () => {
+  it("steadied persists through the skipped round and clears once it acts", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.4);
     let s = duel();
-    s = applyAction(s, "bash");
-    s = applyAction(s, "end");
-    s = applyAction(s, "bash"); // steadied: damage only, no deny
-    expect(s.enemies[0].denied).toBe(false);
-    s = applyAction(s, "end");
-    expect(s.player.hp).toBe(26); // this time the strike lands
-    expect(s.enemies[0].steadied).toBe(false); // it acted; deniable again
+    s = applyAction(s, "bash"); // denied + steadied
+    s = applyAction(s, "end"); // skipped round: steadied persists
+    expect(s.enemies[0].steadied).toBe(true);
+    s = applyAction(s, "end"); // it acts on the fresh plan
+    expect(s.enemies[0].steadied).toBe(false); // deniable again (charges permitting)
   });
 });
 
@@ -591,7 +598,7 @@ describe("golden combat run", () => {
           0,
         ],
         "phase": "loot",
-        "playerHp": 27,
+        "playerHp": 27.28,
       }
     `);
   });
@@ -660,7 +667,9 @@ describe("item effects (every class)", () => {
     let s = withGear([{ key: "heal_on_kill", value: 4 }], { intent: "strike", hp: 1, maxHp: 50 });
     s = { ...s, player: { ...s.player, hp: 20 } };
     s = applyAction(s, "attack");
-    expect(s.player.hp).toBe(24);
+    // 20 + 4 effect heal, plus the sub-1 training heal from clearing the room
+    expect(s.player.hp).toBeGreaterThanOrEqual(24);
+    expect(s.player.hp).toBeLessThan(25);
     expect(s.stats.effectTriggers.heal_on_kill).toBe(1);
   });
 
@@ -669,7 +678,9 @@ describe("item effects (every class)", () => {
     s = { ...s, player: { ...s.player, hp: 20 } };
     s = applyAction(s, "attack");
     expect(s.phase).toBe("loot");
-    expect(s.player.hp).toBe(24);
+    // 20 + 4 effect heal, plus the sub-1 training heal from clearing the room
+    expect(s.player.hp).toBeGreaterThanOrEqual(24);
+    expect(s.player.hp).toBeLessThan(25);
     expect(s.stats.effectTriggers.heal_on_clear).toBe(1);
   });
 
@@ -887,5 +898,48 @@ describe("riposte perfect parry", () => {
     const s = { ...newGame(), enemies: [heavyFoe], riposteArmed: true };
     s.player.block = 6;
     expect(expectedIncomingDamage(s)).toBe(0); // full-value block, no crush
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Guard fatigue: consecutive guarding rounds decay the block gained.
+// ---------------------------------------------------------------------------
+describe("guard fatigue", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("pins the fatigue constants", () => {
+    expect(COMBAT.guardFatigueDecay).toBe(3);
+    expect(COMBAT.guardFatigueFloor).toBe(2);
+  });
+
+  it("guarding every round decays the block; a round off resets it", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.4);
+    const base = advanceRoom(beginRun(newGame()));
+    const foe = withIntent(base.enemies[0], "guard", { hp: 90, maxHp: 90 }); // passive foe
+    let s = { ...base, enemies: [foe], selected: 0 };
+
+    s = applyAction(s, "guard");
+    expect(s.player.block).toBe(4); // round 1: full guard
+    s = applyAction(s, "end");
+
+    s = applyAction(s, "guard");
+    expect(s.player.block).toBe(2); // round 2: 4 - 3 decayed, floored at 2
+    s = applyAction(s, "end");
+
+    s = applyAction(s, "attack"); // round 3: no guard — arm recovers
+    s = applyAction(s, "end");
+
+    s = applyAction(s, "guard");
+    expect(s.player.block).toBe(4); // full strength again
+  });
+
+  it("burst guarding within ONE round is not penalized", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.4);
+    const base = advanceRoom(beginRun(newGame()));
+    const foe = withIntent(base.enemies[0], "guard", { hp: 90, maxHp: 90 });
+    let s = { ...base, enemies: [foe], selected: 0 };
+    s = applyAction(s, "guard");
+    s = applyAction(s, "guard");
+    expect(s.player.block).toBe(8); // 2 x 4, same-round stacking at full value
   });
 });

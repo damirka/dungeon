@@ -96,12 +96,18 @@ Encounter shape (2026-07-03):
 - Encounters cap at 3 enemies. Power bands 3-4 can roll a squeezed triple
   (`tripleChance` 0.22/0.30): the pair budget spread across three bodies at
   `×0.8` per-enemy stats. Band 5 is a native 3-enemy group.
-- Denial DELAYS, it does not cancel (2026-07-03): a bashed enemy keeps its
-  telegraphed intent and it lands next round. Bash is also charge-limited to
-  `TACTICAL.bashChargesPerRoom` (2) per encounter — without both rules,
-  bash+attack every other turn was an unanswerable boss loop ("a cheat code").
-  Bosses were re-tuned down (`×2.7 hp / ×1.35 dmg`) since they no longer get
-  cheesed.
+- Denial = POSTPONE + RE-ROLL (2026-07-04, designer-chosen): a bashed enemy
+  skips its action this round, and the plan that comes back next round is a
+  FRESH intent roll — bosses advance their script via `Enemy.scriptShift`, so
+  a stopped boss heavy is deleted, never deferred. Two rejected variants,
+  both sim-tested: pure delay (same heavy returns — a trap players walk into)
+  and re-roll-acts-this-round (bash loses all mitigation; skilled win rate
+  collapsed to 0.2%). Bash stays charge-limited (2/room) + steadied.
+- Policy A/B (2026-07-04, `pnpm sim:policies`, 800 paired seeds): the player's
+  "ALWAYS bash a live heavy telegraph" principle scores 4.38% vs the greedy
+  baseline's 4.00% (+0.38pts, within noise; 30 vs 27 discordant seeds) while
+  spending ~68% more bash charges. Verdict: heavies are the correct default
+  bash target; liberal spending on them loses nothing.
 - Desperation AI: non-boss enemies at <=35% HP stop rolling guard/aim, and the
   last enemy standing also stops casting support — cornered foes attack.
 - The Heavy combo (2026-07-04): a landed Heavy EXPOSES the target for the rest
@@ -147,9 +153,29 @@ Encounter shape (2026-07-03):
   `GameState.transcript` (capped 8000 lines). The UI has a "Download run log"
   button (topbar ⤓ and the end screen) — use these logs to tune off real
   player runs.
-- Known playtest reads to analyze from downloaded logs: guard(1ST)+attacks may
-  be too dominant vs regular encounters once block gear stacks (players report
-  taking 0 damage from non-elite rooms).
+- GUARD FATIGUE (2026-07-04, answering the guard-spam meta confirmed by an
+  external playtester log: heavy 60 / guard 52 / bash 0 / riposte 0 to F4):
+  each consecutive round ending with a guard reduces guard's block by
+  `COMBAT.guardFatigueDecay` (3), floored at `guardFatigueFloor` (2); a round
+  without guarding resets it. Same-round guard stacking is NOT penalized —
+  burst-guarding a big telegraph is the intended play. Sim landed at 2.8%
+  with no other retune; the bot's guard usage halved.
+- ADOPTED after initial decline (designer reversed 2026-07-04): "level-up HP
+  should also heal current HP" — see the revised growth-heals pillar above.
+- Riposte tooltip uses plain player language first ("negates damage for one
+  attack, once per encounter") with the mechanical fine print second —
+  discoverability over precision in the headline (designer copy).
+- UX BACKLOG from external playtest (owner to prioritize, none blocking):
+  distinct battle-vs-exploration presentation; colour-coded stat bars;
+  full-stat hover comparison on loot (current -> with-item); per-effect chip
+  layout on loot cards; stamina as token icons on action cards; mouse-only and
+  gamepad input; highlighted interactive objects/titles in exploration.
+  Shipped quick wins: whisper-faint battle grid overlay (.hd-battle-grid),
+  bigger HP bar (24px) + stamina pips (18px).
+- PROPOSED, awaiting designer (from friend + original spec's dodge hook): a
+  risk/reward dodge — e.g. an aggressive stance action that attacks AND rolls
+  DEX-scaled % to dodge ALL damage that round (no block). Fits the crit-only
+  RNG budget as a chosen gamble; design it in the unique-mechanics session.
 - Catalog sprite mislabels are excluded in tools/build_item_templates.py
   (MISLABELED_IDS — e.g. oryx_r10_c18 "Crimson Shield" is visually a sword).
 - The skilled sim bot treats Bash and Riposte as premium resources (Riposte
@@ -201,14 +227,13 @@ Enemy attack-type labels in the mapper include placeholders such as `burn`, `poi
 - HP is scarce. Crimson Vial, Crimson Potion, and Crimson Elixir are instant
   heal-now loot choices, not wearable gear, and they use mapped Oryx item
   sprites.
-- DESIGN PILLAR (designer decision, 2026-07-04): NO healing between floors or
-  encounters — `postEncounterHealFraction`/`postLevelHealFraction` stay 0 and
-  max-HP gains from TRAINING do not heal. Early sloppy choices are supposed to
-  hurt later in the run; damage taken on floor 1 is a scar the player carries.
-  Do not re-suggest floor-transition heals. If chip-attrition ever needs
-  softening, the sanctioned lever is potion AVAILABILITY/predictability (e.g.
-  a guaranteed potion option in elite/boss drafts that competes with gear),
-  not free regeneration.
+- DESIGN PILLAR (revised by designer 2026-07-04, adopting playtester
+  feedback): growth heals — training/level-up max-HP gains ALSO restore that
+  much current HP (`currentHpFromMaxHpGainFraction: 1`), and equip upgrades
+  heal their positive delta. Free regeneration stays OFF:
+  `postEncounterHealFraction`/`postLevelHealFraction` remain 0 and
+  floor-transition heals remain rejected. Damage growth was tightened to
+  `×1.45` to absorb the extra sustain (sim back at ~3.7%).
 - Ruling on HP gear (designer, 2026-07-04): EQUIPPING an item that raises max
   HP heals exactly the positive delta over the previous value (upgrading +3 ->
   +15 amulet heals 12; downgrades/sidegrades heal 0). This is the current
@@ -269,20 +294,17 @@ Machine-readable metrics live in:
 - `data/balance_metrics_python_reference.json` - archived historical
   Python/legacy snapshot; not a tuning target
 
-React engine skilled-policy batch (2026-07-03, seed `920000`, 5000 runs, after
-the bash delay+charge fix; `ENEMY_CURVE` `16 hp ×1.40` / `4 dmg ×1.36`, boss
-`×2.7/×1.35`, elite `×1.7/×1.25`):
+React engine skilled-policy batch (2026-07-04, seed `920000`, 5000 runs, after
+bash postpone+re-roll, guard fatigue, and the growth-heals reversal;
+`ENEMY_CURVE` `16 hp ×1.44` / `4 dmg ×1.45`, boss `×3.4/×1.35`, elite
+`×1.9/×1.3`):
 
-- win rate: `4.30%` (after the Riposte perfect-parry, boss HP `×3.0`, elite
-  HP `×1.8`)
-- average rooms cleared: `28.1`
-- reach L3: `99.2%`, L4: `74.7%`, L5: `11.1%`
-- deaths by room kind: boss `2568`, elite `1410`, then P3 `242` / P4 `214` —
-  premium fights end runs; heavy-crush keeps regular encounters honest.
+- win rate: `3.90%`
+- average rooms cleared: `28.2`
+- reach L3: `99.2%`, L4: `80.3%`, L5: `10.9%`
+- deaths by room kind: boss `2195`, elite `2169`, then P3/P4 ~130 each —
+  premium fights are ~90% of deaths.
 - timeouts: `0`
-- Closing the bash loop required re-easing the rest of the game (growth
-  `×1.44/×1.43 -> ×1.40/×1.36`, boss `×3.0/×1.6 -> ×2.7/×1.35`) because the
-  old numbers were implicitly balanced around denial-spam.
 
 Random-policy batch (2000 runs, same dungeon seeds):
 
@@ -351,6 +373,23 @@ Track these on every tuning pass:
 - `data/balance_metrics_latest.json`
 - `AGENTS.md`
 - `THREAD_HANDOFF.md`
+
+## Deploying (Vercel, 2026-07-04)
+
+- `vercel.json` is checked in: `pnpm build` -> `dist/`, SPA rewrite that
+  excludes `data/`, `legacy/`, `room-assets/`, `app-assets/`.
+- `pnpm build` copies `data/` into `dist/data` — the game fetches
+  `/data/dungeon_room_catalog.json` and `/data/dungeon_plan.json` at runtime
+  (both also have bundled fallbacks).
+- Production builds show ONLY the Play workspace
+  (`src/features/workbench/workspaces.ts` gates on `import.meta.env.PROD`).
+  Mappers/Levels/Dungeon/Playtest are the local dev studio; their save
+  endpoints live in the Vite mapper-API plugin and cannot work on static
+  hosting. `useApiStatus` also skips the `/api/status` poll in prod.
+- Verified: the static `dist/` (python http.server, no Vite plugins) boots,
+  fetches data, and plays combat with zero console errors and zero /api calls.
+- The `dist-static` entry in `.claude/launch.json` serves the built bundle for
+  local pre-deploy checks.
 
 ## Tests
 

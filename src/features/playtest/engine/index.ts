@@ -19,6 +19,7 @@ export {
   tierOf,
 } from "./loot";
 export {
+  bashHeavyPolicy,
   chooseSimAction,
   comparePolicies,
   estimateReactWinRate,

@@ -17,6 +17,7 @@ import {
   tacticalVisualsFromPayload,
 } from "./mapperApi.mjs";
 import { weaponTemplatesFileContents, WEAPON_TEMPLATES_OUT } from "./build_weapon_templates.mjs";
+import { roomDataFileContents, ROOM_DATA_OUT } from "./build_room_data.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = (rel) => JSON.parse(readFileSync(path.join(ROOT, rel), "utf-8"));
@@ -234,5 +235,12 @@ test("weapon templates rebake matches the checked-in generator output", () => {
   const { contents, count } = weaponTemplatesFileContents(ITEM_CATALOG);
   const baked = readFileSync(path.join(ROOT, WEAPON_TEMPLATES_OUT), "utf-8");
   assert.equal(contents, baked);
+  assert.ok(count > 0);
+});
+
+test("bundled room snapshot matches the room catalog", () => {
+  const { contents, count } = roomDataFileContents(ROOM_CATALOG);
+  const baked = readFileSync(path.join(ROOT, ROOM_DATA_OUT), "utf-8");
+  assert.equal(contents, baked, "roomData.ts is stale — run `node tools/build_room_data.mjs`");
   assert.ok(count > 0);
 });

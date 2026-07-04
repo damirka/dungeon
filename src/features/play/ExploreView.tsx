@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, JSX } from "react";
+import type { CSSProperties, JSX, MouseEvent as ReactMouseEvent } from "react";
 import type { BiomeId } from "../playtest/engine";
 import { HERO_ID } from "../../game/spriteData";
 import { SpriteActor } from "./SpriteActor";
 import type { RoomDef } from "../../game/roomData";
 import { drawRoom, loadSheet, pickRoom } from "./roomRender";
+import { useGamepad } from "./useGamepad";
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
@@ -104,8 +105,8 @@ export function ExploreView({
     return () => ro.disconnect();
   }, []);
 
-  useEffect(() => {
-    const move = (dx: number, dy: number) => {
+  const move = useCallback(
+    (dx: number, dy: number) => {
       if (dx < 0) setFacing("left");
       if (dx > 0) setFacing("right");
       setPos((p) => {
@@ -120,18 +121,83 @@ export function ExploreView({
         }
         return { x: nx, y: ny };
       });
-    };
+    },
+    [room, blocked, exit, enter, triggerRow],
+  );
+
+  // mouse: click a tile to walk there (greedy stepping; direct input retargets/stops)
+  const posRef = useRef(pos);
+  posRef.current = pos;
+  const walkTarget = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const target = walkTarget.current;
+      if (!target) return;
+      const p = posRef.current;
+      const dx = Math.sign(target.x - p.x) as -1 | 0 | 1;
+      const dy = Math.sign(target.y - p.y) as -1 | 0 | 1;
+      if (!dx && !dy) {
+        walkTarget.current = null;
+        return;
+      }
+      const stepOk = (sx: number, sy: number) => {
+        if (!sx && !sy) return false;
+        const nx = p.x + sx;
+        const ny = p.y + sy;
+        if (nx < 0 || ny < 0 || nx >= room.width || ny >= room.height) return false;
+        return !blocked.has(`${nx},${ny}`);
+      };
+      // prefer the axis with more distance left; sidestep on the other when blocked
+      const primary: [number, number] = Math.abs(target.x - p.x) >= Math.abs(target.y - p.y) ? [dx, 0] : [0, dy];
+      const secondary: [number, number] = primary[0] ? [0, dy] : [dx, 0];
+      if (stepOk(...primary)) move(...primary);
+      else if (stepOk(...secondary)) move(...secondary);
+      else walkTarget.current = null;
+    }, 120);
+    return () => window.clearInterval(id);
+  }, [move, blocked, room]);
+
+  const onWorldClick = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (!tile) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const scale = rect.width / worldW || 1; // CSS transforms don't change layout, but stay safe
+      walkTarget.current = {
+        x: clamp(Math.floor((event.clientX - rect.left) / (tile * scale)), 0, room.width - 1),
+        y: clamp(Math.floor((event.clientY - rect.top) / (tile * scale)), 0, room.height - 1),
+      };
+    },
+    [tile, worldW, room],
+  );
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
-      if (k === "arrowright" || k === "d") { e.preventDefault(); move(1, 0); }
-      else if (k === "arrowleft" || k === "a") { e.preventDefault(); move(-1, 0); }
-      else if (k === "arrowup" || k === "w") { e.preventDefault(); move(0, -1); }
-      else if (k === "arrowdown" || k === "s") { e.preventDefault(); move(0, 1); }
+      if (k === "arrowright" || k === "d") { e.preventDefault(); walkTarget.current = null; move(1, 0); }
+      else if (k === "arrowleft" || k === "a") { e.preventDefault(); walkTarget.current = null; move(-1, 0); }
+      else if (k === "arrowup" || k === "w") { e.preventDefault(); walkTarget.current = null; move(0, -1); }
+      else if (k === "arrowdown" || k === "s") { e.preventDefault(); walkTarget.current = null; move(0, 1); }
       else if (k === "enter" || k === " ") { e.preventDefault(); enter(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [room, blocked, exit, enter, triggerRow]);
+  }, [move, enter]);
+
+  // controller: d-pad / left stick walks, A (or Start) steps through the doorway
+  useGamepad(
+    useCallback(
+      (event) => {
+        if (event.kind === "move") {
+          walkTarget.current = null;
+          move(event.dx, event.dy);
+        } else if (event.button === "a" || event.button === "start") {
+          enter();
+        }
+      },
+      [move, enter],
+    ),
+  );
 
   const heroSize = Math.round(tile * 0.8);
   const heroWX = (pos.x + 0.5) * tile;
@@ -152,7 +218,8 @@ export function ExploreView({
       {tile > 0 && (
         <div
           className="hd-explore-world"
-          style={{ width: worldW, height: worldH, transform: `translate(${Math.round(camX)}px, ${Math.round(camY)}px)` } as CSSProperties}
+          onClick={onWorldClick}
+          style={{ width: worldW, height: worldH, cursor: "pointer", transform: `translate(${Math.round(camX)}px, ${Math.round(camY)}px)` } as CSSProperties}
         >
           <canvas ref={canvasRef} className="pixelated" />
           <div className="hd-exit" style={{ left: exitWX, top: exitWY, width: tile * 1.5, height: tile * 1.5 }}>
@@ -167,7 +234,7 @@ export function ExploreView({
       <div className="hd-explore-vignette" />
       <div className="hd-explore-hud">
         <div className="hd-explore-title">{kind === "entrance" ? `Floor ${level} — ${locationName}` : locationName}</div>
-        <div className="hd-explore-hint">{hint || "Move with WASD / arrows — step into the doorway to descend"}</div>
+        <div className="hd-explore-hint">{hint || "WASD / arrows, click a tile, or gamepad — step into the doorway to descend"}</div>
       </div>
     </div>
   );

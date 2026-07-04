@@ -69,8 +69,11 @@ function tip(state: GameState, action: PlayerAction, target: Enemy | undefined):
     if ((p.abilityCharges || 0) <= 0) return <><b>Riposte</b> — spent for this room.</>;
     return (
       <>
-        <b>Riposte</b> — perfect parry: +{CHARACTER.ability.block} block, your block is FULLY effective (even vs Heavy ‡), and
-        counter EVERY attacker for <span className="dmg">{target ? humanDamage(actionDamage(state, target, "ability")) : "—"}</span> each.
+        <b>Riposte</b> — negates damage for one attack, once per encounter.{" "}
+        <span style={{ opacity: 0.8 }}>
+          (+{CHARACTER.ability.block} block, block fully stops Heavy ‡, counters every attacker for{" "}
+          <span className="dmg">{target ? humanDamage(actionDamage(state, target, "ability")) : "—"}</span> each.)
+        </span>
       </>
     );
   }
@@ -84,7 +87,9 @@ function tip(state: GameState, action: PlayerAction, target: Enemy | undefined):
   }
   const dmg = target ? actionDamage(state, target, action) : 0;
   if (action === "bash") {
-    const blockedText = target?.steadied ? " Target is steadied — damage only." : " Delays the target's telegraphed action to next turn.";
+    const blockedText = target?.steadied
+      ? " Target is steadied — damage only."
+      : " Stops the target's action this round — next round it rolls a NEW plan.";
     return (
       <>
         <b>Bash</b> — <span className="dmg">{humanDamage(dmg)}</span> and deny.{blockedText} {p.bashCharges} use

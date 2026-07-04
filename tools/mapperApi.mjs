@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { weaponTemplatesFileContents, WEAPON_TEMPLATES_OUT } from "./build_weapon_templates.mjs";
+import { roomDataFileContents, ROOM_DATA_OUT } from "./build_room_data.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = path.join(ROOT, "data");
@@ -421,7 +422,11 @@ function saveRooms(payload, root) {
   const jsonPath = path.join(root, "data", "dungeon_room_catalog.json");
   const catalog = roomCatalogFromPayload(payload, readExistingJson(jsonPath));
   writeJsonFile(jsonPath, catalog);
-  return { ok: true, saved: "rooms", rooms: catalog.rooms.length };
+  // Keep the game's bundled snapshot fresh: it is the fallback that static
+  // deploys (no /data, no save API) serve to players and the room designer.
+  const { contents, count } = roomDataFileContents(catalog);
+  atomicWrite(path.join(root, ROOM_DATA_OUT), contents);
+  return { ok: true, saved: "rooms", rooms: catalog.rooms.length, bundled_rooms: count };
 }
 
 function saveTacticalVisuals(payload, root) {

@@ -1,7 +1,9 @@
+import { useCallback, useState } from "react";
 import type { CSSProperties, JSX } from "react";
 import { activeItemForSlot, humanGain, recommendedLootIndex, slotForItem, type GameState, type Item, type ItemRarity } from "../playtest/engine";
 import { ItemSprite } from "./ItemSprite";
 import type { LootIconKind } from "./icons";
+import { useGamepad } from "./useGamepad";
 
 const RARITY_VAR: Record<ItemRarity, string> = {
   common: "var(--rar-common)",
@@ -74,6 +76,24 @@ function CompareLine({ state, item }: { state: GameState; item: Item }): JSX.Ele
 export function LootDraft({ state, onPick }: { state: GameState; onPick: (choice: number | "skip") => void }): JSX.Element {
   const room = state.dungeon[state.roomIndex - 1];
   const reco = recommendedLootIndex(state);
+  const count = state.draft.length;
+
+  // controller: d-pad/stick moves the cursor, A takes the card, B skips
+  const [cursor, setCursor] = useState(() => (typeof reco === "number" && reco >= 0 ? reco : 0));
+  const padConnected = useGamepad(
+    useCallback(
+      (event) => {
+        if (!count) return;
+        if (event.kind === "move") {
+          if (event.dx) setCursor((c) => (c + event.dx + count) % count);
+          return;
+        }
+        if (event.button === "a") onPick(Math.min(cursor, count - 1));
+        else if (event.button === "b" || event.button === "start") onPick("skip");
+      },
+      [count, cursor, onPick],
+    ),
+  );
 
   return (
     <div className="hd-overlay">
@@ -87,7 +107,13 @@ export function LootDraft({ state, onPick }: { state: GameState; onPick: (choice
           <div
             key={i}
             className="hd-loot-card"
-            style={{ "--rarity": RARITY_VAR[item.rarity], animationDelay: `${0.12 + i * 0.14}s` } as CSSProperties}
+            style={
+              {
+                "--rarity": RARITY_VAR[item.rarity],
+                animationDelay: `${0.12 + i * 0.14}s`,
+                ...(padConnected && cursor === i ? { outline: "2px solid var(--gold)", outlineOffset: 3 } : {}),
+              } as CSSProperties
+            }
             onClick={() => onPick(i)}
             role="button"
             aria-label={`Take ${item.name}`}

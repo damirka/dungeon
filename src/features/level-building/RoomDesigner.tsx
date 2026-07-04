@@ -6,6 +6,7 @@ import {
   Copy,
   Crosshair,
   DoorOpen,
+  Download,
   Eraser,
   FlipHorizontal,
   Gem,
@@ -47,11 +48,13 @@ import {
   ROOM_TILE_LAYERS,
   cellKey,
   createRoom,
+  normalizeRoom,
   pointKey,
   resizeRoomGridFromEdge,
   presetById,
   sanitizeCatalog
 } from "./roomCatalog";
+import { AUTHORED_ROOMS } from "../../game/roomData";
 import type {
   DungeonRoom,
   DungeonRoomCatalog,
@@ -76,7 +79,7 @@ const MAX_CANVAS_ZOOM = 2.5;
 const MAX_HISTORY = 80;
 const EDGE_RESIZE_THRESHOLD = 10;
 const HERO_SPRITE = {
-  url: "/assets/oryx_creatures.png",
+  url: "/room-assets/oryx_creatures.png",
   tileSize: 24,
   sheetWidth: 432,
   sheetHeight: 648,
@@ -138,6 +141,41 @@ function readLocalCatalog() {
   } catch {
     return null;
   }
+}
+
+// Static hosting has no /data catalog and no save API. A fresh browser there
+// falls back to the game's bundled room snapshot so friends start from the real
+// rooms and can share their work through Export / Import instead of POST saves.
+function bundledCatalog(): Partial<DungeonRoomCatalog> | null {
+  if (!AUTHORED_ROOMS.length) {
+    return null;
+  }
+  return {
+    rooms: AUTHORED_ROOMS.map((room) => ({
+      id: room.id,
+      name: room.name,
+      preset: room.preset,
+      width: room.width,
+      height: room.height,
+      dungeon_levels: room.levels,
+      room_kind: room.kind as RoomKind,
+      tags: [],
+      notes: "",
+      tiles: room.tiles.map((tile) => ({
+        x: tile.x,
+        y: tile.y,
+        layer: tile.layer as RoomTileLayer,
+        ...(tile.flip ? { flip_x: true as const } : {}),
+        tile: { sheet: "oryx_world2" as const, col: tile.c, row: tile.r }
+      })),
+      obstacles: room.obstacles,
+      doors: room.doors,
+      spawn: room.spawn,
+      battle_spawn: room.battleSpawn ?? null,
+      enemy_spawns: room.enemySpawns ?? [],
+      updated_at: ""
+    }))
+  };
 }
 
 function readLocalSpritesheet() {
@@ -475,7 +513,7 @@ export function RoomDesigner({ roomCatalog }: RoomDesignerProps) {
     }
     const localCatalog = readLocalCatalog();
     const serverCatalog = roomCatalog.state === "ready" ? roomCatalog.data : null;
-    const initial = sanitizeCatalog(selectInitialCatalog(localCatalog, serverCatalog));
+    const initial = sanitizeCatalog(selectInitialCatalog(localCatalog, serverCatalog) ?? bundledCatalog());
     didHydrate.current = true;
     setCatalog(initial);
     setActiveRoomId(initial.rooms[0]?.id || "");
@@ -594,6 +632,77 @@ export function RoomDesigner({ roomCatalog }: RoomDesignerProps) {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
+
+  // --- share rooms as files (works without the local save API, e.g. static hosting)
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [shareNote, setShareNote] = useState("");
+  const shareNoteTimer = useRef(0);
+
+  const noteShare = useCallback((text: string) => {
+    setShareNote(text);
+    window.clearTimeout(shareNoteTimer.current);
+    shareNoteTimer.current = window.setTimeout(() => setShareNote(""), 7000);
+  }, []);
+
+  const exportCatalog = useCallback(() => {
+    const snapshot = catalogSnapshot(catalog);
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `dungeon-rooms-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    noteShare(`Exported ${catalog.rooms.length} rooms to a JSON file.`);
+  }, [catalog, noteShare]);
+
+  const importCatalogFile = useCallback(
+    async (file: File) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch {
+        noteShare("Import failed: not a JSON file.");
+        return;
+      }
+      // accept a full export ({ rooms: [...] }), a bare room array, or one room
+      const rawRooms = Array.isArray(parsed)
+        ? parsed
+        : parsed && typeof parsed === "object" && Array.isArray((parsed as { rooms?: unknown[] }).rooms)
+          ? ((parsed as { rooms: unknown[] }).rooms)
+          : parsed && typeof parsed === "object" && "width" in (parsed as object)
+            ? [parsed]
+            : null;
+      const incoming = (rawRooms ?? [])
+        .map((raw, index) => normalizeRoom(raw, index))
+        .filter((room): room is DungeonRoom => room !== null && room.tiles.length + room.obstacles.length + room.doors.length > 0);
+      if (!incoming.length) {
+        noteShare("Import failed: no valid rooms in that file.");
+        return;
+      }
+      // per-room newest-wins merge, same rule as cross-browser autosave sync
+      const byId = new Map(catalog.rooms.map((room) => [room.id, room]));
+      let added = 0;
+      let updated = 0;
+      let kept = 0;
+      for (const room of incoming) {
+        const existing = byId.get(room.id);
+        if (!existing) {
+          byId.set(room.id, room);
+          added += 1;
+        } else if (timestampValue(room.updated_at) > timestampValue(existing.updated_at)) {
+          byId.set(room.id, room);
+          updated += 1;
+        } else {
+          kept += 1;
+        }
+      }
+      setCatalog({ ...catalog, rooms: [...byId.values()] });
+      setActiveRoomId(incoming[0].id);
+      noteShare(`Imported ${added + updated} of ${incoming.length} rooms (${added} new, ${updated} updated${kept ? `, ${kept} kept — local copy is newer` : ""}).`);
+    },
+    [catalog, noteShare]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1251,7 +1360,7 @@ export function RoomDesigner({ roomCatalog }: RoomDesignerProps) {
   const effectiveCanvasZoom = zoomedCell / ROOM_CELL_SIZE;
 
   return (
-    <section className="flex h-[calc(100vh-6.25rem)] min-h-0 gap-2 overflow-hidden text-neutral-200">
+    <section className="flex min-h-0 flex-1 gap-2 overflow-hidden text-neutral-200">
       {!libOpen && (
         <button
           type="button"
@@ -1288,6 +1397,38 @@ export function RoomDesigner({ roomCatalog }: RoomDesignerProps) {
             <Plus className="size-4" aria-hidden="true" />
             New Room
           </button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={exportCatalog}
+              className="flex h-8 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-neutral-950 px-2 text-xs font-semibold text-neutral-300 hover:border-amber-400/60 hover:text-amber-300"
+              title="Download all rooms as a JSON file to share"
+            >
+              <Download className="size-3.5" aria-hidden="true" />
+              Export
+            </button>
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              className="flex h-8 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-neutral-950 px-2 text-xs font-semibold text-neutral-300 hover:border-amber-400/60 hover:text-amber-300"
+              title="Import rooms from a shared JSON file (newest edit of each room wins)"
+            >
+              <Upload className="size-3.5" aria-hidden="true" />
+              Import
+            </button>
+          </div>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void importCatalogFile(file);
+              event.target.value = "";
+            }}
+          />
+          {shareNote && <p className="mt-2 text-[11px] leading-4 text-neutral-400">{shareNote}</p>}
         </div>
 
         <div className="border-b border-white/10 p-3">

@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { JSX } from "react";
 import { CHARACTER, DUNGEON, STATS, humanDamage, type GameState } from "../playtest/engine";
 import { HERO_ID } from "../../game/spriteData";
 import { SpriteActor } from "./SpriteActor";
+import { useGamepad } from "./useGamepad";
 
 function Embers({ count = 40 }: { count?: number }): JSX.Element {
   const embers = useMemo(
@@ -49,6 +50,27 @@ export function TitleScreen({
   onToggleMusic: () => void;
   onToggleSfx: () => void;
 }): JSX.Element {
+  // full keyboard + controller: Enter / A / Start all descend
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onBegin();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onBegin]);
+
+  const padConnected = useGamepad(
+    useCallback(
+      (event) => {
+        if (event.kind === "button" && (event.button === "a" || event.button === "start")) onBegin();
+      },
+      [onBegin],
+    ),
+  );
+
   return (
     <div className="hd-screen hd-crt">
       <Embers />
@@ -93,8 +115,13 @@ export function TitleScreen({
         </button>
       </div>
       <div className="font-term" style={{ color: "var(--ink-faint)", fontSize: 15 }}>
-        Keys 1–5 + R · E ends the turn · click an enemy to target
+        Keys 1–5 + R · E ends the turn · Enter descends · mouse works everywhere
       </div>
+      {padConnected && (
+        <div className="font-term" style={{ color: "var(--heal)", fontSize: 14 }}>
+          🎮 controller connected — A attack · X heavy · Y bash · LB sweep · B guard · RB riposte · RT end turn · stick moves
+        </div>
+      )}
     </div>
   );
 }

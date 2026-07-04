@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, CircleDashed, MapPinned } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, CircleDashed, MapPinned } from "lucide-react";
 import { humanizeId } from "../../lib/format";
 import { useJsonResource } from "../../services/api";
 import { WorkspaceChrome } from "../workbench/WorkspaceChrome";
@@ -39,19 +39,22 @@ export function LevelBuilderWorkspace() {
 
   return (
     <WorkspaceChrome eyebrow="Levels" title="Room Design">
-      <div className="min-h-0 flex-1 overflow-auto bg-neutral-950 text-neutral-200">
-        <div className="flex w-full flex-col gap-3 p-3">
-          <RoomDesigner roomCatalog={roomCatalog} />
+      {/* fixed to the viewport: the designer flexes to fill the remaining height
+          and its panels scroll internally — the page itself never scrolls */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden bg-neutral-950 p-3 text-neutral-200">
+        <RoomDesigner roomCatalog={roomCatalog} />
 
-          <section className="rounded-md border border-white/10 bg-neutral-900">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <MapPinned className="size-5 text-neutral-300" aria-hidden="true" />
-                <h3 className="text-sm font-semibold">Biome Progression</h3>
-              </div>
-              <span className="text-xs font-medium text-neutral-500">{plan?.updated_at || "loading"}</span>
+        <details className="group shrink-0 rounded-md border border-white/10 bg-neutral-900">
+          <summary className="flex cursor-pointer select-none items-center justify-between px-4 py-2 [&::-webkit-details-marker]:hidden">
+            <div className="flex items-center gap-2">
+              <ChevronRight className="size-4 text-neutral-500 transition-transform group-open:rotate-90" aria-hidden="true" />
+              <MapPinned className="size-4 text-neutral-300" aria-hidden="true" />
+              <h3 className="text-sm font-semibold">Biome Progression &amp; Route Shape</h3>
             </div>
+            <span className="text-xs font-medium text-neutral-500">{plan?.updated_at || "loading"}</span>
+          </summary>
 
+          <div className="max-h-[40vh] overflow-auto border-t border-white/10">
             {biomePlan.state === "failed" && (
               <div className="px-4 py-5 text-sm text-rose-700">{biomePlan.message}</div>
             )}
@@ -89,11 +92,9 @@ export function LevelBuilderWorkspace() {
                 ))}
               </div>
             )}
-          </section>
 
-          {plan?.future_paths && (
-            <section className="rounded-md border border-white/10 bg-neutral-900 px-4 py-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            {plan?.future_paths && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-4">
                 <div>
                   <h3 className="text-sm font-semibold">Route Shape</h3>
                   <p className="mt-1 text-sm text-neutral-400">{plan.future_paths.example_shape}</p>
@@ -108,9 +109,9 @@ export function LevelBuilderWorkspace() {
                   {plan.future_paths.enabled ? "enabled" : "later"}
                 </span>
               </div>
-            </section>
-          )}
-        </div>
+            )}
+          </div>
+        </details>
       </div>
     </WorkspaceChrome>
   );

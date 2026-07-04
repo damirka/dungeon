@@ -12,6 +12,18 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["exec", "vite", "--port", "5210", "--strictPort", "--host", "127.0.0.1"],
       "port": 5210
+    },
+    {
+      "name": "dist-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "5220", "--directory", "dist", "--bind", "127.0.0.1"],
+      "port": 5220
+    },
+    {
+      "name": "dist-static-verify",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "5221", "--directory", "dist", "--bind", "127.0.0.1"],
+      "port": 5221
     }
   ]
 }

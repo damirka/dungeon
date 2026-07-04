@@ -12,13 +12,19 @@ React playtest engine.
   `src/features/playtest/engine` barrel rather than reaching into individual
   files. Tune the game here first; Python and legacy HTML must follow React, not
   the other way around.
-- `src/features/playtest/` - React-side playtest workspace (historical balance
-  snapshot + future native batch runner).
+- `src/features/playtest/` - now holds ONLY the engine (the Playtest workspace
+  page was removed; batch metrics live in `pnpm sim:balance` +
+  `data/balance_metrics_latest.json`).
 - `src/features/play/` - the default first-screen playable game (UI + explore layer) on top of the engine.
 - `src/features/mappers/` - separate character, FX, and item mapper workspace.
   The Item Editor tab is native React (`ItemCatalogEditor.tsx`); saving items
   through `/api/save/items` also re-bakes `weaponTemplates.ts` automatically.
 - `src/features/level-building/` - native level / room-building workspace; early but real, not just a placeholder.
+  Ships in production builds alongside Play: without the save API it keeps edits
+  in localStorage and shares rooms as JSON files via Export / Import. The
+  bundled fallback snapshot `src/game/roomData.ts` is re-baked from the room
+  catalog by `tools/build_room_data.mjs` on every room save (drift-guarded by
+  `pnpm test:web`).
 - `src/features/dungeon/` - native Dungeon Map workspace: per-floor enemy
   rosters/bosses/biomes (including enemy types normally assigned to other
   floors) plus authored-room coverage per floor. Persists a designer plan that

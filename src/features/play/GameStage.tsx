@@ -26,6 +26,7 @@ import { EndScreen, downloadRunLog } from "./Screens";
 import { SpriteActor, type ActorState } from "./SpriteActor";
 import { Vitals } from "./Vitals";
 import type { UseGame } from "./useGame";
+import { useGamepad, type PadButton, type PadEvent } from "./useGamepad";
 
 const BIOME_NAME: Record<BiomeId, string> = {
   forest: "Green Forest",
@@ -382,6 +383,19 @@ export function GameStage(game: UseGame): JSX.Element {
 
   useEffect(() => () => fxTimers.current.forEach((t) => clearTimeout(t)), []);
 
+  const cycleTarget = useCallback(
+    (dir: 1 | -1) => {
+      const alive = state.enemies.map((en, i) => ({ en, i })).filter((x) => x.en.hp > 0);
+      if (alive.length < 2) return;
+      const order = alive.map((x) => x.i);
+      const cur = order.indexOf(state.selected);
+      const next = order[(cur + dir + order.length) % order.length];
+      select(next);
+      sfx("target");
+    },
+    [state.enemies, state.selected, select, sfx],
+  );
+
   // keyboard controls
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -392,6 +406,10 @@ export function GameStage(game: UseGame): JSX.Element {
         } else if (e.key.toLowerCase() === "s" || e.key === "Escape") pickLoot("skip");
         return;
       }
+      if (state.phase === "dead" || state.phase === "won") {
+        if (e.key === "Enter") restart();
+        return;
+      }
       if (state.phase !== "combat" || busy || exploring || state.player.hp <= 0) return;
       const map: Record<string, PlayerAction> = { "1": "attack", "2": "heavy", "3": "bash", "4": "sweep", "5": "guard", r: "ability", R: "ability", e: "end", E: "end", " ": "attack" };
       const action = map[e.key];
@@ -400,20 +418,46 @@ export function GameStage(game: UseGame): JSX.Element {
         act(action);
         return;
       }
-      const alive = state.enemies.map((en, i) => ({ en, i })).filter((x) => x.en.hp > 0);
-      if ((e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "Tab") && alive.length > 1) {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "Tab") {
         e.preventDefault();
-        const order = alive.map((x) => x.i);
-        const cur = order.indexOf(state.selected);
-        const dir = e.key === "ArrowLeft" ? -1 : 1;
-        const next = order[(cur + dir + order.length) % order.length];
-        select(next);
-        sfx("target");
+        cycleTarget(e.key === "ArrowLeft" ? -1 : 1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [state, busy, exploring, act, select, pickLoot, sfx]);
+  }, [state, busy, exploring, act, pickLoot, restart, cycleTarget]);
+
+  // controller: A attack · X heavy · Y bash · LB sweep · B guard · RB ability ·
+  // RT/Start end turn · d-pad/stick cycles target. Loot has its own handler in
+  // LootDraft; explore movement lives in ExploreView.
+  useGamepad(
+    useCallback(
+      (event: PadEvent) => {
+        if (state.phase === "dead" || state.phase === "won") {
+          if (event.kind === "button" && (event.button === "a" || event.button === "start")) restart();
+          return;
+        }
+        if (state.phase !== "combat" || busy || exploring || state.player.hp <= 0) return;
+        if (event.kind === "move") {
+          if (event.dx) cycleTarget(event.dx);
+          return;
+        }
+        const map: Partial<Record<PadButton, PlayerAction>> = {
+          a: "attack",
+          x: "heavy",
+          y: "bash",
+          lb: "sweep",
+          b: "guard",
+          rb: "ability",
+          rt: "end",
+          start: "end",
+        };
+        const action = map[event.button];
+        if (action) act(action);
+      },
+      [state.phase, state.player.hp, busy, exploring, act, restart, cycleTarget],
+    ),
+  );
 
   const recommended = recommendedAction();
   const floorRooms = state.dungeon.filter((r) => r.level === level);
@@ -475,6 +519,15 @@ export function GameStage(game: UseGame): JSX.Element {
           <>
         <RoomBackdrop room={stageRoom} layout={{ tile: stage.tile, offX: stage.offX, offY: stage.offY }} vignette={0.5} />
         <div className="hd-stage-bg hd-stage-bg-over" style={{ ["--glow" as string]: BIOME_GLOW[biome] } as CSSProperties} />
+        {/* whisper-faint tactical grid so the battlefield reads as cells */}
+        <div
+          className="hd-battle-grid"
+          aria-hidden="true"
+          style={{
+            backgroundSize: `${stage.tile}px ${stage.tile}px`,
+            backgroundPosition: `${stage.offX}px ${stage.offY}px`,
+          }}
+        />
 
         <div className="hd-actors-grid" key={`grid-${state.roomIndex}`}>
           <div className="hd-unit hd-unit-hero" ref={heroRef} style={{ left: heroPos.x, top: heroPos.y, zIndex: 10 + Math.round(heroPos.y) }}>

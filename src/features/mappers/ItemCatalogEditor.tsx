@@ -13,7 +13,7 @@ import { useJsonResource } from "../../services/api";
  */
 
 const SAVE_ENDPOINT = "/api/save/items";
-const ITEM_SHEET = "/assets/oryx_items.png";
+const ITEM_SHEET = "/room-assets/oryx_items.png";
 
 const RARITIES = ["common", "uncommon", "rare", "very rare", "epic", "legendary", "unique"] as const;
 const ENGINE_SLOTS = ["weapon", "amulet", "charm", "relic", "shield", "focus", "consumable"];
