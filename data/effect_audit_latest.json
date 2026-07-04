@@ -1,0 +1,141 @@
+{
+  "runs": 120,
+  "seed": 920000,
+  "baseline": {
+    "win_rate": 0.025,
+    "avg_rooms": 26.97
+  },
+  "note": "Paired seeds: identical dungeons with vs without a single-effect starting item at epic magnitude.",
+  "effects": [
+    {
+      "effect": "thorns",
+      "label": "Thorns",
+      "audit_value": 3,
+      "triggers": 2742,
+      "triggers_per_run": 22.85,
+      "win_rate": 0.0167,
+      "win_delta": -0.0083,
+      "rooms_delta": 0.45
+    },
+    {
+      "effect": "battle_start_block",
+      "label": "Opening block",
+      "audit_value": 4,
+      "triggers": 3417,
+      "triggers_per_run": 28.48,
+      "win_rate": 0.025,
+      "win_delta": 0,
+      "rooms_delta": 1.09
+    },
+    {
+      "effect": "battle_start_bolt",
+      "label": "Opening bolt",
+      "audit_value": 3,
+      "triggers": 3312,
+      "triggers_per_run": 27.6,
+      "win_rate": 0.0333,
+      "win_delta": 0.0083,
+      "rooms_delta": 0.68
+    },
+    {
+      "effect": "stamina_on_kill",
+      "label": "Stamina on kill",
+      "audit_value": 1,
+      "triggers": 5447,
+      "triggers_per_run": 45.39,
+      "win_rate": 0.025,
+      "win_delta": 0,
+      "rooms_delta": 1.03
+    },
+    {
+      "effect": "heal_on_kill",
+      "label": "Heal on kill",
+      "audit_value": 2,
+      "triggers": 5494,
+      "triggers_per_run": 45.78,
+      "win_rate": 0.1,
+      "win_delta": 0.075,
+      "rooms_delta": 4.79
+    },
+    {
+      "effect": "heal_on_clear",
+      "label": "Heal on clear",
+      "audit_value": 2,
+      "triggers": 3400,
+      "triggers_per_run": 28.33,
+      "win_rate": 0.0667,
+      "win_delta": 0.0417,
+      "rooms_delta": 3.78
+    },
+    {
+      "effect": "deny_bonus",
+      "label": "Bash damage",
+      "audit_value": 3,
+      "triggers": 0,
+      "triggers_per_run": 0,
+      "win_rate": 0,
+      "win_delta": -0.025,
+      "rooms_delta": 0.32
+    },
+    {
+      "effect": "counter_bonus",
+      "label": "Counter damage",
+      "audit_value": 4,
+      "triggers": 0,
+      "triggers_per_run": 0,
+      "win_rate": 0.0417,
+      "win_delta": 0.0167,
+      "rooms_delta": 0.36
+    },
+    {
+      "effect": "guard_pierce_block",
+      "label": "Block stops pierce",
+      "audit_value": 1,
+      "triggers": 131,
+      "triggers_per_run": 1.09,
+      "win_rate": 0.025,
+      "win_delta": 0,
+      "rooms_delta": -0.23
+    },
+    {
+      "effect": "max_stamina",
+      "label": "Max stamina",
+      "audit_value": 1,
+      "triggers": 0,
+      "triggers_per_run": 0,
+      "win_rate": 0.2,
+      "win_delta": 0.175,
+      "rooms_delta": 6.04
+    },
+    {
+      "effect": "potion_boost",
+      "label": "Potion power",
+      "audit_value": 4,
+      "triggers": 630,
+      "triggers_per_run": 5.25,
+      "win_rate": 0.025,
+      "win_delta": 0,
+      "rooms_delta": 0.25
+    },
+    {
+      "effect": "crit_chance",
+      "label": "Crit chance",
+      "audit_value": 0.08,
+      "triggers": 0,
+      "triggers_per_run": 0,
+      "win_rate": 0.0167,
+      "win_delta": -0.0083,
+      "rooms_delta": 0.76
+    },
+    {
+      "effect": "crit_splash",
+      "label": "Crit splash",
+      "audit_value": 3,
+      "triggers": 1774,
+      "triggers_per_run": 14.78,
+      "win_rate": 0.025,
+      "win_delta": 0,
+      "rooms_delta": -0.67
+    }
+  ]
+}

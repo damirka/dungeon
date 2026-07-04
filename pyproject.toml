@@ -1,0 +1,9 @@
+[project]
+name = "dungeon-balance-core"
+version = "0.1.0"
+description = "A small balance framework for a turn-based dungeon crawler."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

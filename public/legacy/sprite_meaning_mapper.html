@@ -1,0 +1,1261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sprite Meaning Mapper</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101314;
+      --panel: #171b1d;
+      --panel-2: #20262a;
+      --panel-3: #272f33;
+      --text: #eef3ef;
+      --muted: #a7b0aa;
+      --line: #354046;
+      --accent: #9cdb78;
+      --accent-2: #8bbcff;
+      --warn: #ffd166;
+      --bad: #ff7a6c;
+      --teal: #79d6c6;
+      --violet: #c6a4ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, select, textarea, .button-link {
+      font: inherit;
+    }
+
+    button, .button-link {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 7px 10px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button:hover, .button-link:hover { border-color: var(--accent-2); }
+    button.primary { background: #203024; border-color: #4c7452; color: #dffbd8; }
+    button.danger { border-color: #70433e; color: #ffd7d2; }
+
+    input, select, textarea {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0b0e0f;
+      color: var(--text);
+      padding: 7px 9px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 74px;
+      resize: vertical;
+      line-height: 1.35;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: minmax(200px, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(16, 19, 20, 0.96);
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .header-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .save-state {
+      min-width: 134px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(540px, 1.55fr) minmax(360px, 0.95fr);
+      min-height: 0;
+    }
+
+    .left, .right {
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .left {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      border-right: 1px solid var(--line);
+      background: #0e1112;
+    }
+
+    .right {
+      overflow: auto;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(160px, 1fr) 130px 130px 120px 110px;
+      gap: 8px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .stats {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #0c0f10;
+      white-space: nowrap;
+    }
+
+    .pill.good { color: var(--accent); border-color: #4f7442; }
+    .pill.warn { color: var(--warn); border-color: #755f2e; }
+    .pill.blue { color: var(--accent-2); border-color: #3f5875; }
+
+    .workbench {
+      display: grid;
+      grid-template-columns: auto minmax(230px, 1fr);
+      min-height: 0;
+    }
+
+    .sheet-panel {
+      overflow: auto;
+      padding: 14px;
+      border-right: 1px solid var(--line);
+      background: #080a0b;
+    }
+
+    .sheet-frame {
+      position: relative;
+      width: calc(384px * var(--zoom));
+      height: calc(304px * var(--zoom));
+      image-rendering: pixelated;
+    }
+
+    .sheet-frame img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      user-select: none;
+    }
+
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,0.12) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.12) 1px, transparent 1px);
+      background-size: calc(16px * var(--zoom)) calc(16px * var(--zoom));
+      pointer-events: none;
+    }
+
+    .selection-box, .hover-box {
+      position: absolute;
+      width: calc(16px * var(--zoom));
+      height: calc(16px * var(--zoom));
+      pointer-events: none;
+      border: 2px solid var(--warn);
+      box-shadow: 0 0 0 1px #000;
+    }
+
+    .hover-box {
+      border-color: var(--accent-2);
+      opacity: 0.75;
+    }
+
+    .tile-list {
+      min-height: 0;
+      overflow: auto;
+      padding: 10px;
+      display: grid;
+      align-content: start;
+      gap: 6px;
+      background: #0d1011;
+    }
+
+    .tile-row {
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 48px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      cursor: pointer;
+    }
+
+    .tile-row:hover, .tile-row.selected {
+      border-color: var(--accent-2);
+      background: #16202a;
+    }
+
+    .tile-row.ignored {
+      opacity: 0.56;
+    }
+
+    .mini-sprite, .big-sprite {
+      image-rendering: pixelated;
+      background-size: 1152px 912px;
+      background-color: #050607;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+    }
+
+    .mini-sprite {
+      width: 32px;
+      height: 32px;
+    }
+
+    .big-sprite {
+      width: 96px;
+      height: 96px;
+      background-size: 2304px 1824px;
+      border-radius: 7px;
+    }
+
+    .tile-title {
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .tile-sub {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+      margin-top: 2px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--line);
+    }
+
+    .status-dot.live { background: var(--accent); }
+    .status-dot.planned { background: var(--accent-2); }
+    .status-dot.unmapped { background: var(--warn); }
+    .status-dot.ignored { background: var(--bad); }
+
+    .editor-head {
+      display: grid;
+      grid-template-columns: 104px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .editor-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .editor-title h2 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+
+    .coord {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .form-grid .wide { grid-column: 1 / -1; }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0b0e0f;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .check-row input {
+      width: auto;
+      min-height: auto;
+      margin: 0;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 16px 0 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .effect-list {
+      display: grid;
+      gap: 7px;
+    }
+
+    .effect-row {
+      display: grid;
+      grid-template-columns: minmax(125px, 1fr) 80px 36px;
+      gap: 7px;
+      align-items: center;
+    }
+
+    .tag-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 7px;
+      background: var(--panel-2);
+      color: #d7e2dc;
+      font-size: 11px;
+    }
+
+    .json-box {
+      min-height: 160px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    @media (max-width: 1050px) {
+      header { grid-template-columns: 1fr; }
+      .header-actions { justify-content: flex-start; }
+      main { grid-template-columns: 1fr; }
+      .left { border-right: 0; border-bottom: 1px solid var(--line); }
+      .right { max-height: none; }
+      .workbench { grid-template-columns: 1fr; }
+      .sheet-panel { border-right: 0; border-bottom: 1px solid var(--line); }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 680px) {
+      .toolbar, .form-grid { grid-template-columns: 1fr; }
+      .editor-head { grid-template-columns: 1fr; }
+      .sheet-panel { padding: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Sprite Meaning Mapper</h1>
+        <div class="header-meta">Curate each tile into item meaning, effect primitives, rarity fit, and notes.</div>
+      </div>
+      <div class="header-actions">
+        <span class="save-state" id="saveState">Loading...</span>
+        <a class="button-link" href="creature_fx_mapper.html">Creatures / FX</a>
+        <button id="copyJsonBtn">Copy JSON</button>
+        <button id="exportBtn" class="primary">Export JSON</button>
+        <button id="importBtn">Import</button>
+        <button id="resetBtn" class="danger">Reset Seed</button>
+        <input id="importFile" class="file-input" type="file" accept="application/json,.json">
+      </div>
+    </header>
+
+    <main>
+      <section class="left">
+        <div class="toolbar">
+          <input id="search" placeholder="Search name, id, slot, family, effect">
+          <select id="slotFilter"></select>
+          <select id="familyFilter"></select>
+          <select id="statusFilter"></select>
+          <select id="showFilter">
+            <option value="active">Active</option>
+            <option value="all">All tiles</option>
+            <option value="ignored">Ignored only</option>
+            <option value="unmapped">Unmapped</option>
+          </select>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div class="workbench">
+          <div class="sheet-panel">
+            <div class="sheet-frame" id="sheetFrame" style="--zoom: 3">
+              <img id="sheetImage" alt="Oryx item spritesheet" src="file:///Users/damirshamanaev/Downloads/oryx_16-bit_fantasy_1.1/oryx_16bit_fantasy_items_trans.png">
+              <div class="grid-overlay"></div>
+              <div class="hover-box" id="hoverBox" hidden></div>
+              <div class="selection-box" id="selectionBox"></div>
+            </div>
+          </div>
+          <div class="tile-list" id="tileList"></div>
+        </div>
+      </section>
+
+      <aside class="right">
+        <div class="editor-head">
+          <div class="big-sprite" id="bigSprite"></div>
+          <div>
+            <div class="editor-title">
+              <h2 id="editorName">-</h2>
+              <span class="pill blue" id="editorStatus">-</span>
+            </div>
+            <div class="coord" id="editorCoord"></div>
+            <div class="tag-strip" id="editorTags"></div>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <label class="wide">Display name
+            <input id="nameInput">
+          </label>
+          <label>Slot
+            <select id="slotInput"></select>
+          </label>
+          <label>Visual family
+            <select id="familyInput"></select>
+          </label>
+          <label>Status
+            <select id="statusInput"></select>
+          </label>
+          <label>Power role
+            <select id="powerRoleInput"></select>
+          </label>
+          <label class="wide">Meaning value
+            <input id="meaningInput" placeholder="e.g. heavy-control weapon, instant sustain, DEX tempo">
+          </label>
+          <label class="wide">Rarity bands
+            <input id="rarityInput" placeholder="common, uncommon, rare">
+          </label>
+          <label class="wide">Tags
+            <input id="tagsInput" placeholder="axe, crushing, strength">
+          </label>
+          <label class="wide">Notes
+            <textarea id="notesInput" placeholder="Design notes, uncertainty, item identity, balance caveats"></textarea>
+          </label>
+          <label class="wide check-row">
+            <input id="ignoredInput" type="checkbox">
+            Ignore this tile for item generation
+          </label>
+        </div>
+
+        <div class="section-title">
+          <span>Power Recipe</span>
+          <button id="addEffectBtn">Add Effect</button>
+        </div>
+        <div class="effect-list" id="effectList"></div>
+
+        <div class="section-title">
+          <span>Selected Entry JSON</span>
+          <button id="normalizeBtn">Normalize Weights</button>
+        </div>
+        <textarea id="entryJson" class="json-box" readonly></textarea>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/data/oryx_item_catalog_seed.js"></script>
+  <script>
+    const SHEET = {
+      url: "file:///Users/damirshamanaev/Downloads/oryx_16-bit_fantasy_1.1/oryx_16bit_fantasy_items_trans.png",
+      assetUrl: "/assets/oryx_items.png",
+      tileSize: 16,
+      columns: 24,
+      rows: 19,
+      width: 384,
+      height: 304,
+      zoom: 3
+    };
+
+    const STORAGE_KEY = "dungeon_sprite_meaning_mapper_v1";
+    const SAVE_DEBOUNCE_MS = 180;
+    const LIVE_SAVE_ENDPOINT = "/api/save/items";
+    const LIVE_SAVE_ENABLED = location.protocol === "http:" || location.protocol === "https:";
+
+    const SLOT_OPTIONS = [
+      "unmapped", "weapon", "shield", "body", "helmet", "boots", "cloak",
+      "ring", "amulet", "charm", "relic", "consumable", "material",
+      "currency", "supply", "pack", "treasury", "neutral"
+    ];
+    const FAMILY_OPTIONS = [
+      "unknown", "vial", "round_potion", "elixir", "volatile_orb", "ring",
+      "crystal", "cut_gem", "teardrop_gem", "book", "component", "rune",
+      "heart_charm", "key_charm", "orb", "food", "herb", "coin", "helmet",
+      "pack", "garment", "wand", "staff", "rod", "mace", "spear", "sword",
+      "dagger", "axe", "hammer", "bow", "crossbow", "saber", "stick", "cane",
+      "cross", "shield", "boots", "amulet", "robe", "belt", "gloves",
+      "trousers", "hood", "cloak", "armor", "heart", "key", "skull",
+      "scroll", "clock", "candle", "light", "crown", "torch", "stone",
+      "gem", "mushroom", "feather", "bone", "eye"
+    ];
+    const STATUS_OPTIONS = ["unmapped", "planned", "live", "candidate", "rejected"];
+    const POWER_ROLE_OPTIONS = [
+      "unset", "pure_stat", "weapon_base", "weapon_affix", "instant_consumable",
+      "defense", "tempo", "economy", "risk_reward", "build_enabler", "flavor_only"
+    ];
+    const EFFECT_OPTIONS = [
+      "max_hp", "restore_hp", "strength", "dexterity", "weapon_damage",
+      "attack_damage", "heavy_damage", "quick_damage", "sweep_damage",
+      "hit_chance", "crit_chance", "crit_damage", "damage_roll_quality",
+      "initiative", "first_strike", "double_strike", "interrupt", "stun",
+      "stagger", "sunder", "armor_flat_reduction", "guard_first_hit",
+      "boss_damage", "execute_damage", "on_hit_burn", "on_hit_poison",
+      "on_hit_freeze", "on_hit_shock", "curse_power", "luck_pool_bonus",
+      "reroll_token", "merchant_discount"
+    ];
+
+    const $ = id => document.getElementById(id);
+
+    const els = {
+      search: $("search"),
+      slotFilter: $("slotFilter"),
+      familyFilter: $("familyFilter"),
+      statusFilter: $("statusFilter"),
+      showFilter: $("showFilter"),
+      stats: $("stats"),
+      sheetFrame: $("sheetFrame"),
+      sheetImage: $("sheetImage"),
+      hoverBox: $("hoverBox"),
+      selectionBox: $("selectionBox"),
+      tileList: $("tileList"),
+      rightPanel: document.querySelector(".right"),
+      bigSprite: $("bigSprite"),
+      editorName: $("editorName"),
+      editorStatus: $("editorStatus"),
+      editorCoord: $("editorCoord"),
+      editorTags: $("editorTags"),
+      nameInput: $("nameInput"),
+      slotInput: $("slotInput"),
+      familyInput: $("familyInput"),
+      statusInput: $("statusInput"),
+      powerRoleInput: $("powerRoleInput"),
+      meaningInput: $("meaningInput"),
+      rarityInput: $("rarityInput"),
+      tagsInput: $("tagsInput"),
+      notesInput: $("notesInput"),
+      ignoredInput: $("ignoredInput"),
+      effectList: $("effectList"),
+      entryJson: $("entryJson"),
+      saveState: $("saveState"),
+      exportBtn: $("exportBtn"),
+      copyJsonBtn: $("copyJsonBtn"),
+      importBtn: $("importBtn"),
+      importFile: $("importFile"),
+      resetBtn: $("resetBtn"),
+      addEffectBtn: $("addEffectBtn"),
+      normalizeBtn: $("normalizeBtn")
+    };
+
+    let state = null;
+    let selectedId = "oryx_r01_c01";
+    let saveTimer = null;
+    let stateLoadMessage = "Loaded seed catalog";
+    let stateLoadNeedsSave = false;
+
+    function pad(value) {
+      return String(value).padStart(2, "0");
+    }
+
+    function tileId(row, col) {
+      return `oryx_r${pad(row)}_c${pad(col)}`;
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function sameValue(a, b) {
+      return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    }
+
+    function fillSelect(select, label, values) {
+      select.innerHTML = `<option value="">${label}</option>` + values.map(value => `<option value="${value}">${value}</option>`).join("");
+    }
+
+    function fillPlainSelect(select, values) {
+      select.innerHTML = values.map(value => `<option value="${value}">${value}</option>`).join("");
+    }
+
+    function sheetImageUrl() {
+      return LIVE_SAVE_ENABLED ? SHEET.assetUrl : SHEET.url;
+    }
+
+    function spriteStyle(row, col, scale = 3) {
+      return [
+        `background-image:url('${sheetImageUrl()}')`,
+        `background-size:${SHEET.width * scale}px ${SHEET.height * scale}px`,
+        `background-position:-${col * SHEET.tileSize * scale}px -${row * SHEET.tileSize * scale}px`
+      ].join(";");
+    }
+
+    function fromSeedItem(item) {
+      const row = item.sprite.tile_row;
+      const col = item.sprite.tile_col;
+      const recipe = (item.power_recipe || []).map(effect => ({
+        effect: effect.effect,
+        weight: Number(effect.weight || 0)
+      }));
+      return {
+        id: item.id,
+        row,
+        col,
+        x: col * SHEET.tileSize,
+        y: row * SHEET.tileSize,
+        name: item.name || "",
+        slot: item.slot || "unmapped",
+        family: item.visual?.family || "unknown",
+        status: item.runtime_status || "planned",
+        ignored: false,
+        meaning: item.meaning || "",
+        power_role: item.power_role || (item.slot === "consumable" ? "instant_consumable" : item.slot === "weapon" ? "weapon_base" : "unset"),
+        rarity_band: item.rarity_band || [],
+        drop_sources: item.drop_sources || [],
+        effects: recipe,
+        tradeoffs: item.tradeoffs || [],
+        tags: item.tags || [],
+        notes: item.notes || "",
+        seed: clone(item)
+      };
+    }
+
+    function blankTile(row, col) {
+      const isLikelyMargin = row === 0 || col === 0 || col >= 23 || row >= 15;
+      return {
+        id: tileId(row, col),
+        row,
+        col,
+        x: col * SHEET.tileSize,
+        y: row * SHEET.tileSize,
+        name: "",
+        slot: "unmapped",
+        family: "unknown",
+        status: "unmapped",
+        ignored: isLikelyMargin,
+        meaning: "",
+        power_role: "unset",
+        rarity_band: [],
+        drop_sources: [],
+        effects: [],
+        tradeoffs: [],
+        tags: [],
+        notes: isLikelyMargin ? "Default ignored sheet margin/footer/non-item area." : "",
+        seed: null
+      };
+    }
+
+    function buildSeedState() {
+      const catalog = window.ORYX_SEED_CATALOG || {};
+      const byCoord = new Map();
+      (catalog.items || []).forEach(item => {
+        byCoord.set(`${item.sprite.tile_row}:${item.sprite.tile_col}`, fromSeedItem(item));
+      });
+
+      const entries = [];
+      for (let row = 0; row < SHEET.rows; row += 1) {
+        for (let col = 0; col < SHEET.columns; col += 1) {
+          entries.push(byCoord.get(`${row}:${col}`) || blankTile(row, col));
+        }
+      }
+
+      return {
+        version: catalog.version || "0.2.0",
+        seed_version: catalog.version || "0.2.0",
+        updated_at: new Date().toISOString(),
+        source_image: SHEET.url.replace("file://", ""),
+        tile_size: SHEET.tileSize,
+        grid: { columns: SHEET.columns, rows: SHEET.rows },
+        effect_primitives: catalog.effect_primitives || {},
+        notes: "Editable sprite meaning map. Browser localStorage is the draft store; exported JSON is the durable checkpoint.",
+        entries
+      };
+    }
+
+    function mergeField(entry, oldDefault, newDefault, field) {
+      if (!oldDefault || sameValue(entry[field], oldDefault[field])) {
+        if (!sameValue(entry[field], newDefault[field])) {
+          entry[field] = clone(newDefault[field]);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function mergeSeedDefaults(savedState, seedState) {
+      const savedById = new Map((savedState.entries || []).map(entry => [entry.id, entry]));
+      let mergedFields = 0;
+      const entries = seedState.entries.map(seedEntry => {
+        const savedEntry = savedById.get(seedEntry.id);
+        if (!savedEntry) {
+          mergedFields += 1;
+          return seedEntry;
+        }
+
+        const entry = clone(savedEntry);
+        entry.id = seedEntry.id;
+        entry.row = seedEntry.row;
+        entry.col = seedEntry.col;
+        entry.x = seedEntry.x;
+        entry.y = seedEntry.y;
+
+        const oldDefault = savedEntry.seed ? fromSeedItem(savedEntry.seed) : null;
+        const fields = [
+          "name", "slot", "family", "status", "ignored", "meaning", "power_role",
+          "rarity_band", "drop_sources", "effects", "tradeoffs", "tags", "notes"
+        ];
+        fields.forEach(field => {
+          if (mergeField(entry, oldDefault, seedEntry, field)) {
+            mergedFields += 1;
+          }
+        });
+
+        entry.seed = seedEntry.seed ? clone(seedEntry.seed) : null;
+        return entry;
+      });
+
+      return {
+        state: {
+          ...savedState,
+          version: seedState.version,
+          seed_version: seedState.seed_version,
+          source_image: seedState.source_image,
+          tile_size: seedState.tile_size,
+          grid: seedState.grid,
+          effect_primitives: seedState.effect_primitives,
+          notes: savedState.notes || seedState.notes,
+          entries
+        },
+        mergedFields
+      };
+    }
+
+    function loadState() {
+      const seedState = buildSeedState();
+      const raw = localStorage.getItem(STORAGE_KEY);
+      stateLoadMessage = "Loaded seed catalog";
+      stateLoadNeedsSave = false;
+      if (!raw) return seedState;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed.entries)) return seedState;
+        const merged = mergeSeedDefaults(parsed, seedState);
+        stateLoadNeedsSave = merged.mergedFields > 0 || parsed.seed_version !== seedState.seed_version || parsed.version !== seedState.version;
+        stateLoadMessage = merged.mergedFields > 0
+          ? `Merged ${merged.mergedFields} seed updates`
+          : "Loaded local draft";
+        return merged.state;
+      } catch {
+        return seedState;
+      }
+    }
+
+    function saveNow(reason = "Autosaved") {
+      state.updated_at = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      els.saveState.textContent = `${reason} ${new Date().toLocaleTimeString()}`;
+      saveToServer(reason);
+    }
+
+    async function saveToServer(reason = "Autosaved") {
+      if (!LIVE_SAVE_ENABLED) return;
+      const payload = exportState();
+      try {
+        const response = await fetch(LIVE_SAVE_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || `HTTP ${response.status}`);
+        }
+        els.saveState.textContent = `${reason} + disk ${new Date().toLocaleTimeString()}`;
+      } catch (error) {
+        els.saveState.textContent = `Local saved, disk sync failed: ${error.message}`;
+      }
+    }
+
+    function scheduleSave(reason = "Saved") {
+      els.saveState.textContent = "Saving...";
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveNow(reason), SAVE_DEBOUNCE_MS);
+    }
+
+    function selectedEntry() {
+      return state.entries.find(entry => entry.id === selectedId) || state.entries[0];
+    }
+
+    function selectEntry(id, options = {}) {
+      selectedId = id;
+      renderAll();
+      if (options.scrollList) {
+        keepTileVisible(id);
+      }
+      if (options.resetEditor !== false) {
+        scrollEditorToTop();
+      }
+    }
+
+    function keepTileVisible(id) {
+      const node = els.tileList.querySelector(`[data-tile="${CSS.escape(id)}"]`);
+      if (!node) return;
+      const padding = 10;
+      const listTop = els.tileList.scrollTop;
+      const listBottom = listTop + els.tileList.clientHeight;
+      const nodeTop = node.offsetTop - padding;
+      const nodeBottom = node.offsetTop + node.offsetHeight + padding;
+      if (nodeTop < listTop) {
+        els.tileList.scrollTop = Math.max(0, nodeTop);
+      } else if (nodeBottom > listBottom) {
+        els.tileList.scrollTop = nodeBottom - els.tileList.clientHeight;
+      }
+    }
+
+    function scrollEditorToTop() {
+      if (!els.rightPanel) return;
+      els.rightPanel.scrollTop = 0;
+    }
+
+    function entryLabel(entry) {
+      return entry.name || `${entry.ignored ? "Ignored" : "Unmapped"} ${entry.id}`;
+    }
+
+    function normalizeCsv(value) {
+      return value.split(",").map(part => part.trim()).filter(Boolean);
+    }
+
+    function updateSelected(patch, reason = "Saved") {
+      const entry = selectedEntry();
+      Object.assign(entry, patch);
+      scheduleSave(reason);
+      renderAll();
+    }
+
+    function setEffect(index, key, value) {
+      const entry = selectedEntry();
+      entry.effects[index][key] = key === "weight" ? Math.max(0, Number(value) || 0) : value;
+      scheduleSave("Saved");
+      renderAll();
+    }
+
+    function removeEffect(index) {
+      const entry = selectedEntry();
+      entry.effects.splice(index, 1);
+      scheduleSave("Saved");
+      renderAll();
+    }
+
+    function addEffect() {
+      const entry = selectedEntry();
+      entry.effects.push({ effect: "strength", weight: 0.25 });
+      scheduleSave("Saved");
+      renderAll();
+    }
+
+    function normalizeWeights() {
+      const entry = selectedEntry();
+      const total = entry.effects.reduce((sum, effect) => sum + Math.max(0, Number(effect.weight) || 0), 0);
+      if (total <= 0) return;
+      entry.effects = entry.effects.map(effect => ({
+        effect: effect.effect,
+        weight: Number((Math.max(0, Number(effect.weight) || 0) / total).toFixed(3))
+      }));
+      scheduleSave("Normalized");
+      renderAll();
+    }
+
+    function matches(entry) {
+      const q = els.search.value.trim().toLowerCase();
+      const haystack = [
+        entry.id, entry.name, entry.slot, entry.family, entry.status,
+        entry.meaning, entry.power_role, entry.notes,
+        ...entry.tags,
+        ...entry.rarity_band,
+        ...entry.effects.map(effect => effect.effect)
+      ].join(" ").toLowerCase();
+      const show = els.showFilter.value;
+      return (!q || haystack.includes(q))
+        && (!els.slotFilter.value || entry.slot === els.slotFilter.value)
+        && (!els.familyFilter.value || entry.family === els.familyFilter.value)
+        && (!els.statusFilter.value || entry.status === els.statusFilter.value)
+        && (show === "all"
+          || (show === "active" && !entry.ignored)
+          || (show === "ignored" && entry.ignored)
+          || (show === "unmapped" && (entry.status === "unmapped" || entry.slot === "unmapped")));
+    }
+
+    function renderStats() {
+      const total = state.entries.length;
+      const active = state.entries.filter(entry => !entry.ignored).length;
+      const seeded = state.entries.filter(entry => entry.seed).length;
+      const edited = state.entries.filter(entry => entry.meaning || entry.notes || entry.power_role !== (entry.seed?.slot === "consumable" ? "instant_consumable" : entry.seed?.slot === "weapon" ? "weapon_base" : "unset")).length;
+      const effects = state.entries.reduce((sum, entry) => sum + entry.effects.length, 0);
+      els.stats.innerHTML = `
+        <span class="pill good">${active} active</span>
+        <span class="pill blue">${seeded} seeded</span>
+        <span class="pill warn">${edited} edited</span>
+        <span class="pill">${effects} effects</span>
+        <span class="pill">${total} grid cells</span>
+      `;
+    }
+
+    function renderList() {
+      const entries = state.entries.filter(matches);
+      els.tileList.innerHTML = entries.map(entry => {
+        const cls = ["tile-row"];
+        if (entry.id === selectedId) cls.push("selected");
+        if (entry.ignored) cls.push("ignored");
+        const dotClass = entry.ignored ? "ignored" : entry.status;
+        return `<article class="${cls.join(" ")}" data-tile="${entry.id}">
+          <div class="mini-sprite" style="${spriteStyle(entry.row, entry.col, 3)}"></div>
+          <div>
+            <div class="tile-title">${escapeHtml(entryLabel(entry))}</div>
+            <div class="tile-sub">${entry.id} - ${entry.slot} - ${entry.family}</div>
+          </div>
+          <span class="status-dot ${dotClass}"></span>
+        </article>`;
+      }).join("");
+      document.querySelectorAll("[data-tile]").forEach(node => {
+        node.addEventListener("click", () => selectEntry(node.dataset.tile));
+      });
+    }
+
+    function renderSelection() {
+      const entry = selectedEntry();
+      els.selectionBox.style.left = `${entry.col * SHEET.tileSize * SHEET.zoom}px`;
+      els.selectionBox.style.top = `${entry.row * SHEET.tileSize * SHEET.zoom}px`;
+    }
+
+    function renderEditor() {
+      const entry = selectedEntry();
+      els.bigSprite.style = spriteStyle(entry.row, entry.col, 6);
+      els.editorName.textContent = entryLabel(entry);
+      els.editorStatus.textContent = entry.ignored ? "ignored" : entry.status;
+      els.editorCoord.textContent = `${entry.id} - row ${entry.row}, col ${entry.col} - x ${entry.x}, y ${entry.y}`;
+      els.editorTags.innerHTML = entry.tags.slice(0, 10).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("");
+
+      els.nameInput.value = entry.name;
+      els.slotInput.value = entry.slot;
+      els.familyInput.value = entry.family;
+      els.statusInput.value = entry.status;
+      els.powerRoleInput.value = entry.power_role || "unset";
+      els.meaningInput.value = entry.meaning || "";
+      els.rarityInput.value = entry.rarity_band.join(", ");
+      els.tagsInput.value = entry.tags.join(", ");
+      els.notesInput.value = entry.notes || "";
+      els.ignoredInput.checked = Boolean(entry.ignored);
+
+      els.effectList.innerHTML = entry.effects.map((effect, index) => `
+        <div class="effect-row">
+          <select data-effect-index="${index}" data-effect-field="effect">
+            ${EFFECT_OPTIONS.map(option => `<option value="${option}" ${option === effect.effect ? "selected" : ""}>${option}</option>`).join("")}
+          </select>
+          <input data-effect-index="${index}" data-effect-field="weight" type="number" min="0" step="0.01" value="${Number(effect.weight || 0)}">
+          <button data-remove-effect="${index}" title="Remove effect">x</button>
+        </div>
+      `).join("") || `<div class="tile-sub">No effects yet.</div>`;
+
+      document.querySelectorAll("[data-effect-index]").forEach(node => {
+        node.addEventListener("input", () => setEffect(Number(node.dataset.effectIndex), node.dataset.effectField, node.value));
+      });
+      document.querySelectorAll("[data-remove-effect]").forEach(node => {
+        node.addEventListener("click", () => removeEffect(Number(node.dataset.removeEffect)));
+      });
+
+      els.entryJson.value = JSON.stringify(exportEntry(entry), null, 2);
+    }
+
+    function renderAll() {
+      renderStats();
+      renderList();
+      renderSelection();
+      renderEditor();
+    }
+
+    function exportEntry(entry) {
+      return {
+        id: entry.id,
+        name: entry.name,
+        sprite: {
+          sheet: "oryx_16bit_fantasy_items_trans.png",
+          tile_col: entry.col,
+          tile_row: entry.row,
+          x: entry.x,
+          y: entry.y,
+          w: SHEET.tileSize,
+          h: SHEET.tileSize
+        },
+        slot: entry.slot,
+        visual: { family: entry.family },
+        status: entry.status,
+        ignored: entry.ignored,
+        meaning: entry.meaning,
+        power_role: entry.power_role,
+        rarity_band: entry.rarity_band,
+        drop_sources: entry.drop_sources,
+        power_recipe: entry.effects,
+        tradeoffs: entry.tradeoffs,
+        tags: entry.tags,
+        notes: entry.notes
+      };
+    }
+
+    function exportState() {
+      return {
+        version: state.version,
+        exported_at: new Date().toISOString(),
+        updated_at: state.updated_at,
+        source_image: state.source_image,
+        tile_size: state.tile_size,
+        grid: state.grid,
+        effect_primitives: state.effect_primitives,
+        entries: state.entries.map(exportEntry)
+      };
+    }
+
+    function exportJson() {
+      const payload = JSON.stringify(exportState(), null, 2);
+      const blob = new Blob([payload + "\n"], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `sprite_meaning_map_${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      saveNow("Exported");
+    }
+
+    async function copyJson() {
+      const payload = JSON.stringify(exportState(), null, 2);
+      try {
+        await navigator.clipboard.writeText(payload);
+        els.saveState.textContent = "Copied JSON";
+      } catch {
+        els.entryJson.value = payload;
+        els.entryJson.select();
+        document.execCommand("copy");
+        els.saveState.textContent = "Copied selected JSON";
+      }
+    }
+
+    function importJsonFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const imported = JSON.parse(String(reader.result || "{}"));
+          const entries = Array.isArray(imported.entries) ? imported.entries : [];
+          const currentById = new Map(state.entries.map(entry => [entry.id, entry]));
+          entries.forEach(importedEntry => {
+            const current = currentById.get(importedEntry.id);
+            if (!current) return;
+            current.name = importedEntry.name || "";
+            current.slot = importedEntry.slot || "unmapped";
+            current.family = importedEntry.visual?.family || importedEntry.family || "unknown";
+            current.status = importedEntry.status || importedEntry.runtime_status || "planned";
+            current.ignored = Boolean(importedEntry.ignored);
+            current.meaning = importedEntry.meaning || "";
+            current.power_role = importedEntry.power_role || "unset";
+            current.rarity_band = importedEntry.rarity_band || [];
+            current.drop_sources = importedEntry.drop_sources || [];
+            current.effects = importedEntry.power_recipe || importedEntry.effects || [];
+            current.tradeoffs = importedEntry.tradeoffs || [];
+            current.tags = importedEntry.tags || [];
+            current.notes = importedEntry.notes || "";
+          });
+          saveNow("Imported");
+          renderAll();
+        } catch (error) {
+          els.saveState.textContent = `Import failed: ${error.message}`;
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function wireEditor() {
+      els.nameInput.addEventListener("input", () => updateSelected({ name: els.nameInput.value }));
+      els.slotInput.addEventListener("input", () => updateSelected({ slot: els.slotInput.value }));
+      els.familyInput.addEventListener("input", () => updateSelected({ family: els.familyInput.value }));
+      els.statusInput.addEventListener("input", () => updateSelected({ status: els.statusInput.value }));
+      els.powerRoleInput.addEventListener("input", () => updateSelected({ power_role: els.powerRoleInput.value }));
+      els.meaningInput.addEventListener("input", () => updateSelected({ meaning: els.meaningInput.value }));
+      els.rarityInput.addEventListener("input", () => updateSelected({ rarity_band: normalizeCsv(els.rarityInput.value) }));
+      els.tagsInput.addEventListener("input", () => updateSelected({ tags: normalizeCsv(els.tagsInput.value) }));
+      els.notesInput.addEventListener("input", () => updateSelected({ notes: els.notesInput.value }));
+      els.ignoredInput.addEventListener("input", () => updateSelected({ ignored: els.ignoredInput.checked }));
+      els.addEffectBtn.addEventListener("click", addEffect);
+      els.normalizeBtn.addEventListener("click", normalizeWeights);
+    }
+
+    function wireSheet() {
+      els.sheetFrame.addEventListener("mousemove", event => {
+        const rect = els.sheetFrame.getBoundingClientRect();
+        const col = Math.floor((event.clientX - rect.left) / (SHEET.tileSize * SHEET.zoom));
+        const row = Math.floor((event.clientY - rect.top) / (SHEET.tileSize * SHEET.zoom));
+        if (row < 0 || col < 0 || row >= SHEET.rows || col >= SHEET.columns) {
+          els.hoverBox.hidden = true;
+          return;
+        }
+        els.hoverBox.hidden = false;
+        els.hoverBox.style.left = `${col * SHEET.tileSize * SHEET.zoom}px`;
+        els.hoverBox.style.top = `${row * SHEET.tileSize * SHEET.zoom}px`;
+      });
+      els.sheetFrame.addEventListener("mouseleave", () => {
+        els.hoverBox.hidden = true;
+      });
+      els.sheetFrame.addEventListener("click", event => {
+        const rect = els.sheetFrame.getBoundingClientRect();
+        const col = Math.floor((event.clientX - rect.left) / (SHEET.tileSize * SHEET.zoom));
+        const row = Math.floor((event.clientY - rect.top) / (SHEET.tileSize * SHEET.zoom));
+        const entry = state.entries.find(item => item.row === row && item.col === col);
+        if (entry) selectEntry(entry.id, { scrollList: true });
+      });
+    }
+
+    function wireFilters() {
+      [els.search, els.slotFilter, els.familyFilter, els.statusFilter, els.showFilter].forEach(node => {
+        node.addEventListener("input", renderAll);
+      });
+    }
+
+    function wireImportExport() {
+      els.exportBtn.addEventListener("click", exportJson);
+      els.copyJsonBtn.addEventListener("click", copyJson);
+      els.importBtn.addEventListener("click", () => els.importFile.click());
+      els.importFile.addEventListener("change", () => {
+        const file = els.importFile.files[0];
+        if (file) importJsonFile(file);
+        els.importFile.value = "";
+      });
+      els.resetBtn.addEventListener("click", () => {
+        if (!confirm("Reset local mapper edits back to the generated seed catalog?")) return;
+        state = buildSeedState();
+        selectedId = "oryx_r01_c01";
+        saveNow("Reset");
+        renderAll();
+      });
+    }
+
+    function boot() {
+      els.sheetImage.src = sheetImageUrl();
+      fillSelect(els.slotFilter, "All slots", SLOT_OPTIONS);
+      fillSelect(els.familyFilter, "All families", FAMILY_OPTIONS);
+      fillSelect(els.statusFilter, "All statuses", STATUS_OPTIONS);
+      fillPlainSelect(els.slotInput, SLOT_OPTIONS);
+      fillPlainSelect(els.familyInput, FAMILY_OPTIONS);
+      fillPlainSelect(els.statusInput, STATUS_OPTIONS);
+      fillPlainSelect(els.powerRoleInput, POWER_ROLE_OPTIONS);
+
+      state = loadState();
+      if (!state.entries.some(entry => entry.id === selectedId)) {
+        selectedId = state.entries.find(entry => !entry.ignored)?.id || state.entries[0].id;
+      }
+      wireEditor();
+      wireSheet();
+      wireFilters();
+      wireImportExport();
+      if (stateLoadNeedsSave) {
+        saveNow(stateLoadMessage);
+      } else {
+        els.saveState.textContent = stateLoadMessage;
+      }
+      renderAll();
+    }
+
+    boot();
+  </script>
+</body>
+</html>

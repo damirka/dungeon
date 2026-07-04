@@ -1,0 +1,38 @@
+{
+  "name": "dungeon-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host ::",
+    "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build",
+    "preview": "vite preview --host ::",
+    "test": "python3 -m unittest discover tests",
+    "test:web": "node --test tools/*.test.mjs",
+    "test:engine": "vitest run",
+    "test:engine:watch": "vitest",
+    "sim:balance": "vitest run --config vitest.balance.config.ts",
+    "sim:effects": "vitest run --config vitest.effects.config.ts",
+    "loot:preview": "vitest run --config vitest.loot.config.ts"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tone": "^15.1.22"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^4.1.9"
+  },
+  "packageManager": "pnpm@9.15.2",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}

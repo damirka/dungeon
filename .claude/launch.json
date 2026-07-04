@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "play",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["exec", "vite", "--port", "5180", "--host", "127.0.0.1"],
+      "port": 5180
+    },
+    {
+      "name": "dungeon-verify",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["exec", "vite", "--port", "5210", "--strictPort", "--host", "127.0.0.1"],
+      "port": 5210
+    }
+  ]
+}

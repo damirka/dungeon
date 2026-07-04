@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dungeon Balance Verifier</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f7f4;
+      --panel: #ffffff;
+      --ink: #171a1c;
+      --muted: #667078;
+      --line: #d9dedb;
+      --ok: #177a5b;
+      --warn: #a56911;
+      --bad: #b33939;
+      --accent: #246b8f;
+      --accent-soft: #e4f1f6;
+      --shadow: 0 1px 2px rgba(20, 28, 32, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.35;
+    }
+
+    button, select, input {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+    }
+
+    aside {
+      border-right: 1px solid var(--line);
+      background: #fbfbf8;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    main {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    .stack { display: grid; gap: 10px; }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+    .mono {
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 9px;
+      min-width: 0;
+      background: #fff;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .wide-metrics {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 7px;
+      padding: 8px 10px;
+      min-height: 36px;
+      cursor: pointer;
+    }
+
+    button:hover { border-color: #aab5b0; }
+    button:disabled {
+      color: #a9b0b4;
+      background: #f0f1ef;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    button.danger {
+      border-color: #d7b8b8;
+      color: var(--bad);
+    }
+
+    select, input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      min-height: 36px;
+      padding: 7px 9px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .hpbar {
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #ecefeb;
+      overflow: hidden;
+    }
+
+    .hpbar > div {
+      height: 100%;
+      width: 100%;
+      background: var(--ok);
+      transition: width 160ms ease;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      min-height: 24px;
+      padding: 2px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #eef1ef;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .status.ok { background: #e3f2eb; color: var(--ok); }
+    .status.warn { background: #fbefd9; color: var(--warn); }
+    .status.bad { background: #f8e5e5; color: var(--bad); }
+
+    .encounter {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      gap: 14px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+      font-size: 12px;
+    }
+
+    th, td {
+      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 700;
+      background: #fafaf7;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    td:first-child,
+    th:first-child {
+      text-align: left;
+    }
+
+    tr.current {
+      background: var(--accent-soft);
+    }
+
+    tr.done {
+      color: #9aa2a6;
+    }
+
+    .log {
+      max-height: 180px;
+      overflow: auto;
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .log div {
+      border-left: 3px solid var(--line);
+      padding-left: 8px;
+    }
+
+    .level-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .level {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px;
+      background: #fff;
+    }
+
+    .level strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .encounter {
+        grid-template-columns: 1fr;
+      }
+
+      .wide-metrics,
+      .metric-grid,
+      .level-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      aside, main { padding: 12px; }
+      .wide-metrics,
+      .metric-grid,
+      .level-grid {
+        grid-template-columns: 1fr;
+      }
+      .row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .wrap button {
+        flex: 1 1 110px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <section class="stack">
+        <div class="row">
+          <div>
+            <h1>Balance Verifier</h1>
+            <p class="muted small">5 floors, no default healing</p>
+          </div>
+          <span id="runStatus" class="status">ready</span>
+        </div>
+      </section>
+
+      <section class="panel stack">
+        <h2>Run State</h2>
+        <div class="metric-grid">
+          <div class="metric"><span>Floor</span><strong id="floorValue">1</strong></div>
+          <div class="metric"><span>Room</span><strong id="roomValue">1</strong></div>
+          <div class="metric"><span>Cleared</span><strong id="clearedValue">0</strong></div>
+        </div>
+        <div>
+          <div class="row small">
+            <span class="muted">HP</span>
+            <span class="mono" id="hpText">10.0 / 10.0</span>
+          </div>
+          <div class="hpbar"><div id="hpFill"></div></div>
+        </div>
+      </section>
+
+      <section class="panel stack">
+        <div class="row">
+          <h2>Stats</h2>
+          <span class="mono small" id="budgetText">0.00 pts</span>
+        </div>
+        <div class="metric-grid">
+          <div class="metric"><span>HP Max</span><strong id="statHp">10.0</strong></div>
+          <div class="metric"><span>STR</span><strong id="statStr">5.0</strong></div>
+          <div class="metric"><span>DEX</span><strong id="statDex">5.0</strong></div>
+        </div>
+        <div class="metric-grid">
+          <div class="metric"><span>HP Pts</span><strong id="hpPts">0.0</strong></div>
+          <div class="metric"><span>STR Pts</span><strong id="strPts">0.0</strong></div>
+          <div class="metric"><span>DEX Pts</span><strong id="dexPts">0.0</strong></div>
+        </div>
+      </section>
+
+      <section class="panel stack">
+        <h2>Allocation</h2>
+        <label class="small muted" for="policySelect">Policy</label>
+        <select id="policySelect"></select>
+        <div class="wrap">
+          <button id="spendPolicy">Spend Policy</button>
+          <button id="spendHp">+ HP</button>
+          <button id="spendStr">+ STR</button>
+          <button id="spendDex">+ DEX</button>
+        </div>
+        <div class="row small">
+          <span class="muted">Unspent reward</span>
+          <span class="mono" id="unspentText">0.00</span>
+        </div>
+      </section>
+
+      <section class="panel stack">
+        <h2>Actions</h2>
+        <div class="wrap">
+          <button id="applyExpected" class="primary">Apply Expected</button>
+          <button id="rollFight">Roll Fight</button>
+          <button id="prevRoom">Back</button>
+          <button id="resetRun" class="danger">Reset</button>
+        </div>
+        <p class="small muted">Expected mode subtracts projected damage. Roll mode uses crit, damage quality, and variance.</p>
+      </section>
+    </aside>
+
+    <main>
+      <section class="encounter">
+        <div class="panel stack">
+          <div class="row">
+            <div>
+              <h2 id="encounterName">Encounter</h2>
+              <p id="encounterTags" class="muted small">baseline</p>
+            </div>
+            <span id="riskBadge" class="status">risk</span>
+          </div>
+
+          <div class="metric-grid wide-metrics">
+            <div class="metric"><span>Enemy HP</span><strong id="enemyHp">0</strong></div>
+            <div class="metric"><span>Enemy DMG</span><strong id="enemyDamage">0</strong></div>
+            <div class="metric"><span>Attack Rule</span><strong id="enemyRule">connects</strong></div>
+            <div class="metric"><span>Enemy EVA</span><strong id="enemyEvasion">0</strong></div>
+          </div>
+
+          <div class="metric-grid wide-metrics">
+            <div class="metric"><span>DMG Quality</span><strong id="damageQuality">0%</strong></div>
+            <div class="metric"><span>Crit</span><strong id="playerCrit">0%</strong></div>
+            <div class="metric"><span>Player DPT</span><strong id="playerDpt">0</strong></div>
+            <div class="metric"><span>Enemy DPT</span><strong id="enemyDpt">0</strong></div>
+          </div>
+
+          <div class="metric-grid wide-metrics">
+            <div class="metric"><span>Rounds</span><strong id="roundsToKill">0</strong></div>
+            <div class="metric"><span>Expected DMG</span><strong id="expectedDamage">0</strong></div>
+            <div class="metric"><span>Required HP</span><strong id="requiredHp">0</strong></div>
+            <div class="metric"><span>Margin</span><strong id="survivalMargin">0.00</strong></div>
+          </div>
+        </div>
+
+        <div class="panel stack">
+          <h2>Power</h2>
+          <div class="metric-grid">
+            <div class="metric"><span>Total Power</span><strong id="powerScore">0</strong></div>
+            <div class="metric"><span>Need</span><strong id="powerNeed">0</strong></div>
+            <div class="metric"><span>Ratio</span><strong id="powerRatio">0%</strong></div>
+          </div>
+          <div class="stack small">
+            <div class="row"><span class="muted">Scarcity rule</span><span class="mono">no heals</span></div>
+            <div class="row"><span class="muted">HP from HP stat</span><span class="mono">enabled</span></div>
+            <div class="row"><span class="muted">Reward next</span><span class="mono" id="rewardText">1.55 pts</span></div>
+            <div class="row"><span class="muted">Build read</span><span class="mono" id="buildRead">0 / 0 / 0</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel stack">
+        <div class="row">
+          <h2>Level Pressure</h2>
+          <span class="small muted">current stats against every room</span>
+        </div>
+        <div id="levelGrid" class="level-grid"></div>
+      </section>
+
+      <section class="panel stack">
+        <div class="row">
+          <h2>Encounter Table</h2>
+          <span class="small muted">margin below 1.0 means expected death</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Room</th>
+                <th>Enemy</th>
+                <th>HP</th>
+                <th>DMG</th>
+                <th>P DPT</th>
+                <th>Crit</th>
+                <th>Quality</th>
+                <th>Exp DMG</th>
+                <th>Margin</th>
+                <th>Power</th>
+              </tr>
+            </thead>
+            <tbody id="encounterRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel stack">
+        <h2>Run Log</h2>
+        <div id="runLog" class="log"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const COMBAT = {
+      minPlayerHitChance: 0.32,
+      maxPlayerHitChance: 0.95,
+      basePlayerHitChance: 0.57,
+      dexterityHitScale: 0.062,
+      dexterityHitExponent: 0.62,
+      enemyEvasionHitScale: 0.038,
+      enemyEvasionExponent: 0.55,
+      baseCritChance: 0.03,
+      dexterityCritScale: 0.024,
+      dexterityCritExponent: 0.72,
+      enemyEvasionCritScale: 0.006,
+      maxCritChance: 0.55,
+      critMultiplier: 1.80,
+      dexterityDamageQualityScale: 0.030,
+      dexterityDamageQualityExponent: 0.62,
+      enemyEvasionDamageQualityScale: 0.016,
+      enemyEvasionDamageQualityExponent: 0.55,
+      maxDamageQuality: 0.30,
+      basePlayerDamage: 1.0,
+      strengthDamageScale: 1.0,
+      strengthDamageExponent: 1.0,
+      damageVariance: 0.12,
+      maxCombatRounds: 200
+    };
+
+    const STATS = {
+      baseHp: 10.0,
+      hpPerPoint: 1.18,
+      baseStrength: 5.0,
+      strengthPerPoint: 0.58,
+      baseDexterity: 5.0,
+      dexterityPerPoint: 0.58
+    };
+
+    const DUNGEON = {
+      levels: 5,
+      encountersPerLevel: 3,
+      initialStatBudget: 0,
+      statBudgetGainPerEncounter: 1.55,
+      statBudgetGainPerLevel: 3.25,
+      statBudgetGainGrowth: 1.08
+    };
+
+    const ENEMY_CURVE = {
+      baseHp: 8.9,
+      hpGrowth: 1.132,
+      baseDamage: 0.58,
+      damageGrowth: 1.170,
+      baseAccuracy: 0.64,
+      accuracyGrowthPerLevel: 0.020,
+      baseEvasion: 3.7,
+      evasionGrowth: 1.09,
+      bossHpMultiplier: 3.55,
+      bossDamageMultiplier: 2.35,
+      bossAccuracyBonus: 0.07,
+      bossEvasionMultiplier: 1.11
+    };
+
+    const ARCHETYPES = {
+      raider: { name: "Raider", hpFactor: 1.00, damageFactor: 1.00, accuracyDelta: 0.00, evasionFactor: 1.00, tags: ["baseline"] },
+      brute: { name: "Brute", hpFactor: 1.35, damageFactor: 1.18, accuracyDelta: -0.04, evasionFactor: 0.72, tags: ["hp-check"] },
+      duelist: { name: "Duelist", hpFactor: 0.86, damageFactor: 0.96, accuracyDelta: 0.08, evasionFactor: 1.45, tags: ["dex-check"] },
+      stalker: { name: "Stalker", hpFactor: 0.92, damageFactor: 1.28, accuracyDelta: 0.04, evasionFactor: 1.20, tags: ["burst-check"] }
+    };
+
+    const ORDER = ["raider", "brute", "duelist", "stalker"];
+
+    const POLICIES = [
+      { id: "manual", name: "Manual", weights: null },
+      { id: "survivor", name: "Survivor 45/45/10", weights: { hp: 0.45, strength: 0.45, dexterity: 0.10 } },
+      { id: "balanced", name: "Balanced 33/33/33", weights: { hp: 1, strength: 1, dexterity: 1 } },
+      { id: "strength", name: "STR dominant", weights: { hp: 0.30, strength: 0.45, dexterity: 0.25 } },
+      { id: "hp", name: "HP dominant", weights: { hp: 0.45, strength: 0.30, dexterity: 0.25 } },
+      { id: "dex", name: "DEX dominant", weights: { hp: 0.30, strength: 0.25, dexterity: 0.45 } },
+      { id: "stonewall", name: "Stonewall", weights: { hp: 0.65, strength: 0.20, dexterity: 0.15 } },
+      { id: "glass", name: "Glass cannon", weights: { hp: 0.16, strength: 0.63, dexterity: 0.21 } }
+    ];
+
+    const state = {
+      roomIndex: 0,
+      currentHp: STATS.baseHp,
+      alloc: { hp: 0, strength: 0, dexterity: 0 },
+      unspent: 0,
+      history: [],
+      log: ["Run started: HP=10, STR=5, DEX=5."]
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function clamp(value, lower, upper) {
+      return Math.max(lower, Math.min(upper, value));
+    }
+
+    function pct(value) {
+      return `${(value * 100).toFixed(1)}%`;
+    }
+
+    function fmt(value, digits = 1) {
+      return Number.isFinite(value) ? value.toFixed(digits) : "0.0";
+    }
+
+    function makeEnemy(level, key, isBoss) {
+      const arch = ARCHETYPES[key];
+      const levelIndex = level - 1;
+      let maxHp = ENEMY_CURVE.baseHp * Math.pow(ENEMY_CURVE.hpGrowth, levelIndex) * arch.hpFactor;
+      let damage = ENEMY_CURVE.baseDamage * Math.pow(ENEMY_CURVE.damageGrowth, levelIndex) * arch.damageFactor;
+      let accuracy = ENEMY_CURVE.baseAccuracy + ENEMY_CURVE.accuracyGrowthPerLevel * levelIndex + arch.accuracyDelta;
+      let evasion = ENEMY_CURVE.baseEvasion * Math.pow(ENEMY_CURVE.evasionGrowth, levelIndex) * arch.evasionFactor;
+      const tags = [...arch.tags];
+      let name = `L${level} ${arch.name}`;
+      if (isBoss) {
+        maxHp *= ENEMY_CURVE.bossHpMultiplier;
+        damage *= ENEMY_CURVE.bossDamageMultiplier;
+        accuracy += ENEMY_CURVE.bossAccuracyBonus;
+        evasion *= ENEMY_CURVE.bossEvasionMultiplier;
+        tags.push("boss");
+        name = `L${level} Boss ${arch.name}`;
+      }
+      return {
+        name,
+        level,
+        maxHp: Number(maxHp.toFixed(2)),
+        damage: Number(damage.toFixed(2)),
+        accuracy: clamp(accuracy, 0.35, 0.92),
+        evasion: Number(evasion.toFixed(2)),
+        tags,
+        isBoss
+      };
+    }
+
+    function buildDungeon() {
+      const rooms = [];
+      for (let level = 1; level <= DUNGEON.levels; level += 1) {
+        for (let slot = 0; slot < DUNGEON.encountersPerLevel; slot += 1) {
+          const key = ORDER[(level + slot - 1) % ORDER.length];
+          rooms.push(makeEnemy(level, key, false));
+        }
+        const bossKey = ORDER[(level + DUNGEON.encountersPerLevel - 1) % ORDER.length];
+        rooms.push(makeEnemy(level, bossKey, true));
+      }
+      return rooms;
+    }
+
+    const dungeon = buildDungeon();
+
+    function getStats() {
+      return {
+        maxHp: STATS.baseHp + state.alloc.hp * STATS.hpPerPoint,
+        strength: STATS.baseStrength + state.alloc.strength * STATS.strengthPerPoint,
+        dexterity: STATS.baseDexterity + state.alloc.dexterity * STATS.dexterityPerPoint
+      };
+    }
+
+    function playerBaseDamage(stats) {
+      return Math.max(0, COMBAT.basePlayerDamage + COMBAT.strengthDamageScale * Math.pow(Math.max(0, stats.strength), COMBAT.strengthDamageExponent));
+    }
+
+    function playerHitChance(stats, enemy) {
+      const dexBonus = COMBAT.dexterityHitScale * Math.pow(Math.max(0, stats.dexterity), COMBAT.dexterityHitExponent);
+      const evasionPenalty = COMBAT.enemyEvasionHitScale * Math.pow(Math.max(0, enemy.evasion), COMBAT.enemyEvasionExponent);
+      return clamp(COMBAT.basePlayerHitChance + dexBonus - evasionPenalty, COMBAT.minPlayerHitChance, COMBAT.maxPlayerHitChance);
+    }
+
+    function playerCritChance(stats, enemy) {
+      const dexBonus = COMBAT.dexterityCritScale * Math.pow(Math.max(0, stats.dexterity), COMBAT.dexterityCritExponent);
+      const evasionPenalty = COMBAT.enemyEvasionCritScale * Math.sqrt(Math.max(0, enemy.evasion));
+      return clamp(COMBAT.baseCritChance + dexBonus - evasionPenalty, 0, COMBAT.maxCritChance);
+    }
+
+    function playerDamageQuality(stats, enemy) {
+      const dexBonus = COMBAT.dexterityDamageQualityScale * Math.pow(Math.max(0, stats.dexterity), COMBAT.dexterityDamageQualityExponent);
+      const evasionPenalty = COMBAT.enemyEvasionDamageQualityScale * Math.pow(Math.max(0, enemy.evasion), COMBAT.enemyEvasionDamageQualityExponent);
+      return clamp(dexBonus - evasionPenalty, 0, COMBAT.maxDamageQuality);
+    }
+
+    function damageQualityMultiplier(stats, enemy) {
+      return 1 + COMBAT.damageVariance * playerDamageQuality(stats, enemy);
+    }
+
+    function project(stats, enemy) {
+      const hit = playerHitChance(stats, enemy);
+      const crit = playerCritChance(stats, enemy);
+      const baseDamage = playerBaseDamage(stats);
+      const damageQuality = playerDamageQuality(stats, enemy);
+      const playerDpt = hit * baseDamage * (1 + COMBAT.damageVariance * damageQuality) * (1 + crit * (COMBAT.critMultiplier - 1));
+      const enemyDpt = enemy.damage;
+      const rounds = enemy.maxHp / Math.max(playerDpt, 1e-9);
+      const expectedDamage = enemyDpt * Math.max(0, rounds - 0.5);
+      const margin = stats.maxHp / Math.max(expectedDamage, 1e-9);
+      const currentMargin = state.currentHp / Math.max(expectedDamage, 1e-9);
+      const powerScore = stats.maxHp * playerDpt / Math.max(enemyDpt, 1e-9);
+      const powerNeed = enemy.maxHp;
+      return { crit, damageQuality, baseDamage, playerDpt, enemyDpt, rounds, expectedDamage, margin, currentMargin, powerScore, powerNeed };
+    }
+
+    function rewardFor(enemy) {
+      if (enemy.isBoss && enemy.level >= DUNGEON.levels) return 0;
+      const base = enemy.isBoss ? DUNGEON.statBudgetGainPerLevel : DUNGEON.statBudgetGainPerEncounter;
+      return base * Math.pow(DUNGEON.statBudgetGainGrowth, enemy.level - 1);
+    }
+
+    function spend(stat, amount) {
+      const spendAmount = Math.min(amount, state.unspent);
+      if (spendAmount <= 0) return;
+      const oldMax = getStats().maxHp;
+      state.alloc[stat] += spendAmount;
+      state.unspent -= spendAmount;
+      if (stat === "hp") {
+        const newMax = getStats().maxHp;
+        state.currentHp = Math.min(newMax, state.currentHp + Math.max(0, newMax - oldMax));
+      }
+      render();
+    }
+
+    function normalizeWeights(weights) {
+      const total = weights.hp + weights.strength + weights.dexterity;
+      return { hp: weights.hp / total, strength: weights.strength / total, dexterity: weights.dexterity / total };
+    }
+
+    function spendByPolicy() {
+      const selected = POLICIES.find((policy) => policy.id === $("policySelect").value);
+      if (!selected || !selected.weights || state.unspent <= 0) return;
+      const weights = normalizeWeights(selected.weights);
+      const amount = state.unspent;
+      const oldMax = getStats().maxHp;
+      state.alloc.hp += amount * weights.hp;
+      state.alloc.strength += amount * weights.strength;
+      state.alloc.dexterity += amount * weights.dexterity;
+      state.unspent = 0;
+      const newMax = getStats().maxHp;
+      state.currentHp = Math.min(newMax, state.currentHp + Math.max(0, newMax - oldMax));
+      render();
+    }
+
+    function grantReward(enemy) {
+      const reward = rewardFor(enemy);
+      if (reward > 0) {
+        state.unspent += reward;
+        const selected = POLICIES.find((policy) => policy.id === $("policySelect").value);
+        if (selected && selected.weights) spendByPolicy();
+      }
+      return reward;
+    }
+
+    function pushLog(text) {
+      state.log.unshift(text);
+      state.log = state.log.slice(0, 40);
+    }
+
+    function finishRoom(enemy, damageTaken, mode, rounds) {
+      const before = state.currentHp;
+      state.currentHp = Math.max(0, state.currentHp - damageTaken);
+      if (state.currentHp <= 0) {
+        pushLog(`${mode}: died to ${enemy.name} after ${fmt(before, 1)} HP entered.`);
+        render();
+        return;
+      }
+      const reward = grantReward(enemy);
+      state.history.push({
+        roomIndex: state.roomIndex,
+        currentHp: before,
+        alloc: { ...state.alloc },
+        unspent: state.unspent,
+        log: [...state.log]
+      });
+      pushLog(`${mode}: cleared ${enemy.name} in ${fmt(rounds, 1)} rounds, took ${fmt(damageTaken, 2)}, gained ${fmt(reward, 2)} pts.`);
+      state.roomIndex = Math.min(dungeon.length, state.roomIndex + 1);
+      render();
+    }
+
+    function applyExpected() {
+      if (state.roomIndex >= dungeon.length || state.currentHp <= 0) return;
+      spendByPolicy();
+      const enemy = dungeon[state.roomIndex];
+      const stats = getStats();
+      const p = project(stats, enemy);
+      if (state.currentHp <= p.expectedDamage) {
+        state.currentHp = 0;
+        pushLog(`Expected: ${enemy.name} requires ${fmt(p.expectedDamage, 2)} HP; run died.`);
+        render();
+        return;
+      }
+      finishRoom(enemy, p.expectedDamage, "Expected", p.rounds);
+    }
+
+    function variedDamage(baseDamage, quality = 0) {
+      const variance = COMBAT.damageVariance;
+      const low = 1 - variance;
+      const high = 1 + variance;
+      const roll = low + Math.random() * variance * 2;
+      const clampedQuality = clamp(quality, 0, 1);
+      return baseDamage * (roll + (high - roll) * clampedQuality);
+    }
+
+    function rollFight() {
+      if (state.roomIndex >= dungeon.length || state.currentHp <= 0) return;
+      spendByPolicy();
+      const enemy = dungeon[state.roomIndex];
+      const stats = getStats();
+      let enemyHp = enemy.maxHp;
+      let currentHp = state.currentHp;
+      const hit = playerHitChance(stats, enemy);
+      const crit = playerCritChance(stats, enemy);
+      const baseDamage = playerBaseDamage(stats);
+      const quality = playerDamageQuality(stats, enemy);
+      let damageTaken = 0;
+      for (let round = 1; round <= COMBAT.maxCombatRounds; round += 1) {
+        if (Math.random() <= hit) {
+          let damage = variedDamage(baseDamage, quality);
+          if (Math.random() <= crit) damage *= COMBAT.critMultiplier;
+          enemyHp -= damage;
+        }
+        if (enemyHp <= 0) {
+          finishRoom(enemy, damageTaken, "Rolled", round);
+          return;
+        }
+        const incoming = variedDamage(enemy.damage);
+        currentHp -= incoming;
+        damageTaken += incoming;
+        if (currentHp <= 0) {
+          state.currentHp = 0;
+          pushLog(`Rolled: died to ${enemy.name} on round ${round}; enemy had ${fmt(Math.max(0, enemyHp), 1)} HP left.`);
+          render();
+          return;
+        }
+      }
+      state.currentHp = 0;
+      pushLog(`Rolled: ${enemy.name} reached round cap.`);
+      render();
+    }
+
+    function goBack() {
+      const previous = state.history.pop();
+      if (!previous) return;
+      state.roomIndex = previous.roomIndex;
+      state.currentHp = previous.currentHp;
+      state.alloc = { ...previous.alloc };
+      state.unspent = previous.unspent;
+      state.log = [...previous.log];
+      render();
+    }
+
+    function resetRun() {
+      state.roomIndex = 0;
+      state.currentHp = STATS.baseHp;
+      state.alloc = { hp: 0, strength: 0, dexterity: 0 };
+      state.unspent = 0;
+      state.history = [];
+      state.log = ["Run started: HP=10, STR=5, DEX=5."];
+      render();
+    }
+
+    function riskClass(margin) {
+      if (margin >= 1.35) return "ok";
+      if (margin >= 1.0) return "warn";
+      return "bad";
+    }
+
+    function riskLabel(margin) {
+      if (margin >= 1.35) return "stable";
+      if (margin >= 1.0) return "thin";
+      return "lethal";
+    }
+
+    function renderPolicyOptions() {
+      $("policySelect").innerHTML = POLICIES.map((policy) => `<option value="${policy.id}">${policy.name}</option>`).join("");
+      $("policySelect").value = "survivor";
+    }
+
+    function render() {
+      const stats = getStats();
+      const enemy = dungeon[state.roomIndex] || null;
+      const totalBudget = state.alloc.hp + state.alloc.strength + state.alloc.dexterity + state.unspent;
+      const hpPercent = clamp(state.currentHp / Math.max(stats.maxHp, 1e-9), 0, 1);
+
+      $("floorValue").textContent = enemy ? enemy.level : "done";
+      $("roomValue").textContent = enemy ? String((state.roomIndex % 4) + 1) : "done";
+      $("clearedValue").textContent = String(state.roomIndex);
+      $("hpText").textContent = `${fmt(state.currentHp, 1)} / ${fmt(stats.maxHp, 1)}`;
+      $("hpFill").style.width = `${hpPercent * 100}%`;
+      $("hpFill").style.background = hpPercent >= 0.55 ? "var(--ok)" : hpPercent >= 0.25 ? "var(--warn)" : "var(--bad)";
+      $("statHp").textContent = fmt(stats.maxHp, 1);
+      $("statStr").textContent = fmt(stats.strength, 1);
+      $("statDex").textContent = fmt(stats.dexterity, 1);
+      $("hpPts").textContent = fmt(state.alloc.hp, 1);
+      $("strPts").textContent = fmt(state.alloc.strength, 1);
+      $("dexPts").textContent = fmt(state.alloc.dexterity, 1);
+      $("budgetText").textContent = `${fmt(totalBudget, 2)} pts`;
+      $("unspentText").textContent = fmt(state.unspent, 2);
+      $("buildRead").textContent = `${fmt(state.alloc.hp, 1)} / ${fmt(state.alloc.strength, 1)} / ${fmt(state.alloc.dexterity, 1)}`;
+
+      const runStatus = $("runStatus");
+      runStatus.className = "status";
+      if (state.currentHp <= 0) {
+        runStatus.textContent = "dead";
+        runStatus.classList.add("bad");
+      } else if (!enemy) {
+        runStatus.textContent = "clear";
+        runStatus.classList.add("ok");
+      } else {
+        runStatus.textContent = "running";
+        runStatus.classList.add("ok");
+      }
+
+      if (enemy) {
+        const p = project(stats, enemy);
+        const badgeClass = riskClass(p.currentMargin);
+        $("encounterName").textContent = `${state.roomIndex + 1}. ${enemy.name}`;
+        $("encounterTags").textContent = enemy.tags.join(" / ");
+        $("riskBadge").textContent = riskLabel(p.currentMargin);
+        $("riskBadge").className = `status ${badgeClass}`;
+        $("enemyHp").textContent = fmt(enemy.maxHp, 1);
+        $("enemyDamage").textContent = fmt(enemy.damage, 2);
+        $("enemyRule").textContent = "connects";
+        $("enemyEvasion").textContent = fmt(enemy.evasion, 1);
+        $("damageQuality").textContent = pct(p.damageQuality);
+        $("playerCrit").textContent = pct(p.crit);
+        $("playerDpt").textContent = fmt(p.playerDpt, 2);
+        $("enemyDpt").textContent = fmt(p.enemyDpt, 2);
+        $("roundsToKill").textContent = fmt(p.rounds, 1);
+        $("expectedDamage").textContent = fmt(p.expectedDamage, 2);
+        $("requiredHp").textContent = fmt(p.expectedDamage, 2);
+        $("survivalMargin").textContent = fmt(p.currentMargin, 2);
+        $("powerScore").textContent = fmt(p.powerScore, 1);
+        $("powerNeed").textContent = fmt(p.powerNeed, 1);
+        $("powerRatio").textContent = pct(p.powerScore / Math.max(p.powerNeed, 1e-9));
+        $("rewardText").textContent = `${fmt(rewardFor(enemy), 2)} pts`;
+      } else {
+        $("encounterName").textContent = "Dungeon cleared";
+        $("encounterTags").textContent = "all rooms complete";
+        $("riskBadge").textContent = "clear";
+        $("riskBadge").className = "status ok";
+      }
+
+      $("applyExpected").disabled = !enemy || state.currentHp <= 0;
+      $("rollFight").disabled = !enemy || state.currentHp <= 0;
+      $("prevRoom").disabled = state.history.length === 0;
+      $("spendPolicy").disabled = state.unspent <= 0 || $("policySelect").value === "manual";
+      $("spendHp").disabled = state.unspent <= 0;
+      $("spendStr").disabled = state.unspent <= 0;
+      $("spendDex").disabled = state.unspent <= 0;
+
+      renderLevelGrid(stats);
+      renderEncounterRows(stats);
+      renderLog();
+    }
+
+    function renderLevelGrid(stats) {
+      const levels = [];
+      for (let level = 1; level <= DUNGEON.levels; level += 1) {
+        const rooms = dungeon.filter((room) => room.level === level);
+        const margins = rooms.map((room) => project(stats, room).currentMargin);
+        const boss = rooms[rooms.length - 1];
+        const bossMargin = project(stats, boss).currentMargin;
+        const avgMargin = margins.reduce((sum, margin) => sum + margin, 0) / margins.length;
+        levels.push({ level, avgMargin, bossMargin });
+      }
+      $("levelGrid").innerHTML = levels.map((level) => {
+        const cls = riskClass(level.bossMargin);
+        return `
+          <div class="level">
+            <strong>Level ${level.level}</strong>
+            <div class="row small"><span class="muted">Avg margin</span><span class="mono">${fmt(level.avgMargin, 2)}</span></div>
+            <div class="row small"><span class="muted">Boss margin</span><span class="status ${cls}">${fmt(level.bossMargin, 2)}</span></div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderEncounterRows(stats) {
+      $("encounterRows").innerHTML = dungeon.map((room, index) => {
+        const p = project(stats, room);
+        const cls = riskClass(p.currentMargin);
+        const rowClass = index === state.roomIndex ? "current" : index < state.roomIndex ? "done" : "";
+        const label = `${index + 1}. L${room.level}${room.isBoss ? " Boss" : ""}`;
+        return `
+          <tr class="${rowClass}">
+            <td>${label}</td>
+            <td>${room.name.replace(`L${room.level} `, "")}</td>
+            <td>${fmt(room.maxHp, 1)}</td>
+            <td>${fmt(room.damage, 2)}</td>
+            <td>${fmt(p.playerDpt, 2)}</td>
+            <td>${pct(p.crit)}</td>
+            <td>${pct(p.damageQuality)}</td>
+            <td>${fmt(p.expectedDamage, 2)}</td>
+            <td><span class="status ${cls}">${fmt(p.currentMargin, 2)}</span></td>
+            <td>${fmt(p.powerScore, 1)}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderLog() {
+      $("runLog").innerHTML = state.log.map((entry) => `<div>${entry}</div>`).join("");
+    }
+
+    $("spendPolicy").addEventListener("click", spendByPolicy);
+    $("spendHp").addEventListener("click", () => spend("hp", Math.min(1, state.unspent)));
+    $("spendStr").addEventListener("click", () => spend("strength", Math.min(1, state.unspent)));
+    $("spendDex").addEventListener("click", () => spend("dexterity", Math.min(1, state.unspent)));
+    $("applyExpected").addEventListener("click", applyExpected);
+    $("rollFight").addEventListener("click", rollFight);
+    $("prevRoom").addEventListener("click", goBack);
+    $("resetRun").addEventListener("click", resetRun);
+    $("policySelect").addEventListener("change", render);
+
+    renderPolicyOptions();
+    render();
+  </script>
+</body>
+</html>

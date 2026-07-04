@@ -1,0 +1,3357 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tactical Dungeon Playtest</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101214;
+      --panel: #191d20;
+      --panel-2: #20262b;
+      --line: #30383f;
+      --text: #f1f4ef;
+      --muted: #a0a9a2;
+      --good: #98d66e;
+      --warn: #e9c46a;
+      --bad: #e76f51;
+      --blue: #73b7e6;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button,
+    select {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel-2);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:hover { border-color: #53616b; }
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #121518;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .build-tag {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #111416;
+    }
+
+    .rooms {
+      display: grid;
+      grid-template-columns: repeat(20, minmax(34px, 1fr));
+      gap: 4px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #15191c;
+    }
+
+    .room {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      background: #111416;
+    }
+
+    .room.current { border-color: var(--warn); color: var(--warn); background: #242013; }
+    .room.cleared { border-color: #385f38; color: var(--good); }
+    .room.boss { box-shadow: inset 0 -3px 0 rgba(231, 111, 81, 0.45); }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(220px, 300px) minmax(360px, 1fr) minmax(260px, 340px);
+      gap: 12px;
+      padding: 12px 16px 16px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      min-width: 0;
+    }
+
+    .panel h2 {
+      margin: 0;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    .panel-body {
+      padding: 12px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 8px;
+      background: #121619;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .value {
+      margin-top: 3px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .bar {
+      width: 100%;
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #0b0d0f;
+      border: 1px solid var(--line);
+      margin-top: 8px;
+    }
+
+    .bar > span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #6fbf73, #d0c75f);
+      width: 100%;
+    }
+
+    .bar.mana > span {
+      background: linear-gradient(90deg, #4fb7ff, #b899ff);
+    }
+
+    .enemy-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .enemy {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px;
+      background: #13171a;
+      cursor: pointer;
+    }
+
+    .enemy.selected {
+      border-color: var(--warn);
+      background: #211d14;
+    }
+
+    .enemy.riposted {
+      border-color: var(--warn);
+      box-shadow: inset 0 0 0 1px rgba(233, 196, 106, 0.35);
+    }
+
+    .enemy.dead {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .avatar {
+      width: 54px;
+      height: 54px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      background: linear-gradient(135deg, #3e4850, #171b1e);
+      overflow: hidden;
+    }
+
+    .enemy-sprite {
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    .enemy-name {
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .intent {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 7px;
+      margin-top: 5px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #0e1113;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .intent.heavy, .intent.pierce { color: var(--bad); }
+    .intent.strike { color: var(--warn); }
+    .intent.guard { color: var(--blue); }
+    .intent.aim { color: #bf9fff; }
+    .intent.heal, .intent.shield { color: var(--good); }
+    .intent.invisibility { color: #ffd369; }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .actions button {
+      display: grid;
+      align-content: start;
+      gap: 3px;
+      min-height: 78px;
+      padding: 8px;
+      text-align: left;
+      line-height: 1.15;
+    }
+
+    .actions button.pressure-ready {
+      border-color: rgba(115, 183, 230, 0.72);
+      box-shadow: inset 0 0 0 1px rgba(115, 183, 230, 0.18);
+    }
+
+    .actions button.riposte-ready {
+      border-color: rgba(233, 196, 106, 0.82);
+      box-shadow: inset 0 0 0 1px rgba(233, 196, 106, 0.24);
+    }
+
+    .action-title {
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .action-meta,
+    .action-extra {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .action-extra.good { color: var(--good); }
+    .action-extra.warn { color: var(--warn); }
+    .action-extra.bad { color: var(--bad); }
+    .action-extra.pressure { color: var(--blue); }
+
+    .combat-meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .loot-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .loot-card {
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      gap: 10px;
+      text-align: left;
+      min-height: 72px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #13171a;
+      cursor: pointer;
+    }
+
+    .loot-card.consumable {
+      border-color: rgba(118, 197, 255, 0.30);
+    }
+
+    .loot-card.skip {
+      grid-template-columns: 1fr;
+      min-height: 54px;
+      background: #101416;
+    }
+
+    .loot-card.rare,
+    .loot-card.very-rare,
+    .loot-card.epic,
+    .loot-card.legendary {
+      border-color: rgba(255, 201, 107, 0.52);
+      background: #171614;
+    }
+
+    .loot-card.unique {
+      border-color: rgba(255, 118, 96, 0.76);
+      box-shadow: inset 0 0 0 1px rgba(255, 201, 107, 0.32);
+      background: #1a1413;
+    }
+
+    .loot-card:hover { border-color: var(--warn); }
+
+    .sprite {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background-size: 1152px 912px;
+      image-rendering: pixelated;
+      background-color: #050607;
+    }
+
+    .loot-name {
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .loot-desc {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .loot-delta {
+      display: block;
+      font-size: 12px;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    .loot-delta.good { color: var(--good); }
+    .loot-delta.warn { color: var(--warn); }
+    .loot-delta.bad { color: var(--bad); }
+
+    .log {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 510px;
+      overflow: auto;
+      font-size: 12px;
+      color: #d6ddd8;
+    }
+
+    .log-entry {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 8px;
+      background: #111416;
+      line-height: 1.35;
+    }
+
+    .muted { color: var(--muted); }
+    .good { color: var(--good); }
+    .bad { color: var(--bad); }
+
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .rooms { grid-template-columns: repeat(10, minmax(30px, 1fr)); }
+    }
+
+    @media (max-width: 560px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .actions { grid-template-columns: repeat(2, 1fr); }
+      .combat-meta { grid-template-columns: 1fr; }
+      .rooms { grid-template-columns: repeat(5, minmax(30px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Tactical Dungeon Playtest</h1>
+      <div class="top-actions">
+        <span class="build-tag" id="buildTag">character: Balanced Swordsman</span>
+        <select id="characterSelect" title="Playable character">
+          <option value="balancedSwordsman" selected>Balanced Swordsman</option>
+          <option value="axeBruiser" disabled>Axe Bruiser - locked</option>
+          <option value="needleDuelist" disabled>Needle Duelist - locked</option>
+          <option value="warder" disabled>Warder - locked</option>
+        </select>
+        <button id="exportBtn">Export Run</button>
+        <button id="autoBtn">Auto</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+    </header>
+
+    <nav id="rooms" class="rooms"></nav>
+
+    <main>
+      <section class="panel">
+        <h2>Player</h2>
+        <div class="panel-body">
+          <div class="stat">
+            <div class="label">HP</div>
+            <div class="value"><span id="hpValue">10</span> / <span id="maxHpValue">10</span></div>
+            <div class="bar"><span id="hpBar"></span></div>
+          </div>
+          <div class="stat" style="margin-top: 8px">
+            <div class="label">Mana</div>
+            <div class="value"><span id="manaValue">4</span> / <span id="maxManaValue">4</span></div>
+            <div class="bar mana"><span id="manaBar"></span></div>
+          </div>
+          <div class="stat-grid" style="margin-top: 8px">
+            <div class="stat">
+              <div class="label">STR</div>
+              <div class="value" id="strValue">5</div>
+            </div>
+            <div class="stat">
+              <div class="label">DEX</div>
+              <div class="value" id="dexValue">5</div>
+            </div>
+            <div class="stat">
+              <div class="label">Weapon</div>
+              <div class="value" id="weaponValue" style="font-size: 14px">Iron Sword</div>
+            </div>
+            <div class="stat">
+              <div class="label">Gear / Stash</div>
+              <div class="value" id="lootCount">0</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 id="encounterTitle">Encounter</h2>
+        <div class="panel-body">
+          <div class="combat-meta">
+            <div class="stat">
+              <div class="label">Round</div>
+              <div class="value" id="roundValue">1</div>
+            </div>
+            <div class="stat">
+              <div class="label">Target</div>
+              <div class="value" id="targetValue" style="font-size: 14px">-</div>
+            </div>
+            <div class="stat">
+              <div class="label">Mode</div>
+              <div class="value" id="phaseValue" style="font-size: 14px">Combat</div>
+            </div>
+          </div>
+          <div id="enemyList" class="enemy-list"></div>
+          <div class="actions">
+            <button data-action="attack"></button>
+            <button data-action="heavy"></button>
+            <button data-action="quick"></button>
+            <button data-action="sweep"></button>
+            <button data-action="guard"></button>
+            <button data-action="ability"></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Loot / Log</h2>
+        <div class="panel-body">
+          <div id="lootGrid" class="loot-grid"></div>
+          <div id="log" class="log" style="margin-top: 10px"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/data/tactical_enemy_visuals.js"></script>
+  <script src="/data/oryx_creature_fx_catalog_seed.js"></script>
+  <script src="/data/oryx_item_catalog_seed.js"></script>
+  <script>
+    const COMBAT = {
+      minPlayerHitChance: 0.32,
+      maxPlayerHitChance: 0.95,
+      basePlayerHitChance: 0.57,
+      dexterityHitScale: 0.062,
+      dexterityHitExponent: 0.62,
+      enemyEvasionHitScale: 0.038,
+      enemyEvasionExponent: 0.55,
+      baseCritChance: 0.03,
+      dexterityCritScale: 0.024,
+      dexterityCritExponent: 0.72,
+      enemyEvasionCritScale: 0.006,
+      maxCritChance: 0.55,
+      critMultiplier: 1.80,
+      dexterityDamageQualityScale: 0.030,
+      dexterityDamageQualityExponent: 0.62,
+      enemyEvasionDamageQualityScale: 0.016,
+      enemyEvasionDamageQualityExponent: 0.55,
+      maxDamageQuality: 0.30,
+      basePlayerDamage: 1.0,
+      strengthDamageScale: 1.0,
+      strengthDamageExponent: 1.0,
+      damageVariance: 0.12,
+      maxCombatRounds: 200
+    };
+
+    const TACTICAL = {
+      attackDamageMultiplier: 1.00,
+      heavyDamageMultiplier: 1.60,
+      heavyHitModifier: -0.20,
+      heavyEvasionHitPenaltyScale: 0.004,
+      heavyEvasionHitPenaltyFloor: 3.50,
+      heavyEvasionHitPenaltyMax: 0.08,
+      heavyGuardIgnore: 0.45,
+      attackGlancingDamageMultiplier: 0.35,
+      heavyGlancingDamageMultiplier: 0.14,
+      quickGlancingDamageMultiplier: 0.30,
+      sunderDamageBonusPerStack: 0.075,
+      sunderQuickEffectiveness: 0.35,
+      sunderHeavyEffectiveness: 1.08,
+      sunderMaxStacks: 3,
+      quickDamageMultiplier: 0.45,
+      quickHitModifier: 0.10,
+      quickCritModifier: 0.025,
+      quickQualityBonus: 0.07,
+      sweepDamageMultiplier: 0.42,
+      sweepHitModifier: -0.04,
+      sweepQualityBonus: 0.05,
+      sweepDexterityDamagePerPoint: 0.014,
+      sweepMaxDexterityDamageBonus: 0.18,
+      sweepGlancingDamageMultiplier: 0.12,
+      sweepAutoDamageRatio: 0.82,
+      doubleStrikeBaseChance: 0.01,
+      doubleStrikePerDexterity: 0.0040,
+      maxDoubleStrikeChance: 0.16,
+      doubleStrikeDamageMultiplier: 0.45,
+      quickInterruptBaseChance: 0.09,
+      quickInterruptPerDexterity: 0.0075,
+      maxInterruptChance: 0.32,
+      playerGuardReduction: 0.52,
+      pierceGuardReduction: 0.26,
+      enemyGuardReduction: 0.45,
+      strikeDamageMultiplier: 1.04,
+      heavyIntentDamageMultiplier: 1.72,
+      heavyIntentHitModifier: -0.06,
+      pierceDamageMultiplier: 0.80,
+      pierceHitModifier: 0.04,
+      aimAccuracyBonus: 0.16,
+      aimDamageBonus: 0.20,
+      groupPrimaryHpFactor: 0.68,
+      groupPrimaryDamageFactor: 0.40,
+      groupSupportHpFactor: 0.50,
+      groupSupportDamageFactor: 0.30,
+      mageSupportHpFactor: 0.46,
+      mageSupportDamageFactor: 0.24,
+      mageSupportAccuracyDelta: 0.04,
+      mageSupportEvasionFactor: 1.12,
+      supportHealDamageMultiplier: 2.40,
+      supportShieldDamageMultiplier: 2.15,
+      supportShieldMaxHpFraction: 0.42,
+      supportHealThreshold: 0.76,
+      supportInvisibilityHitPenalty: 0.18,
+      maxMana: 4,
+      startingMana: 4,
+      manaRegenPerRound: 1,
+      attackManaCost: 0,
+      heavyManaCost: 2,
+      quickManaCost: 1,
+      sweepManaCost: 2,
+      guardManaCost: 0
+    };
+
+    const STATS = {
+      baseHp: 10.0,
+      baseStrength: 5.0,
+      baseDexterity: 5.0,
+      hpPerPower: 1.18,
+      strengthPerPower: 0.58,
+      dexterityPerPower: 0.58
+    };
+
+    const LOOT = {
+      baseLuckPool: 9.20,
+      luckPoolGrowth: 1.50,
+      normalLuckShare: 0.10,
+      bossLuckShare: 0.21,
+      luckVariance: 0.22,
+      commonCost: 1.0,
+      uncommonCost: 1.20,
+      rareCost: 3.00,
+      veryRareCost: 5.20,
+      epicCost: 7.50,
+      legendaryCost: 10.25,
+      luckyOptionChance: 0.11,
+      luckyPowerMultiplier: 1.45,
+      jackpotOptionChance: 0.025,
+      jackpotPowerMultiplier: 2.35,
+      uniqueOptionChance: 0.004,
+      uniquePowerMultiplier: 3.20,
+      focusDraftChance: 0.30,
+      earlyFocusDraftBonus: 0.18,
+      focusedStatChoiceChance: 0.76,
+      minimumUpgradeScore: 0.05,
+      trainingGainMultiplier: 0.25,
+      statItemWeight: 0.62,
+      weaponItemWeight: 0.38,
+      consumableItemWeight: 0.10,
+      potionHpPerPower: 1.00,
+      wearableSlotLimit: 4,
+      stashSlotLimit: 4,
+      weaponEffectUncommonChance: 0.28,
+      weaponEffectRareChance: 0.50,
+      weaponEffectEpicChance: 0.75,
+      axeCrushEffectCost: 1.15,
+      axeStunEffectCost: 1.45
+    };
+
+    const DUNGEON = {
+      levels: 5,
+      encountersPerLevel: 7,
+      initialStatBudget: 0,
+      statBudgetGainPerEncounter: 1.55,
+      statBudgetGainPerLevel: 3.25,
+      statBudgetGainGrowth: 1.08,
+      postEncounterHealFraction: 0,
+      postLevelHealFraction: 0,
+      currentHpFromMaxHpGainFraction: 1
+    };
+
+    const BASE_WEAPON = {
+      name: "Iron Sword",
+      damageMultiplier: 1,
+      attackDamageMultiplier: 1,
+      heavyDamageMultiplier: 1,
+      quickDamageMultiplier: 1,
+      sweepDamageMultiplier: 1,
+      hitModifier: 0,
+      critModifier: 0,
+      critMultiplierModifier: 0,
+      dexterityMultiplier: 1,
+      sunderOnHit: 0,
+      sunderOnHeavyHit: 0,
+      sunderBonusPerStack: 0,
+      stunOnHeavyHitChance: 0
+    };
+
+    const SLOT_LABELS = {
+      weapon: "Weapon",
+      amulet: "Amulet",
+      charm: "Charm",
+      relic: "Relic",
+      consumable: "Now"
+    };
+
+    const WEAPON_PRESETS = {
+      sword: "Iron Sword",
+      crushingAxe: "Crushing Axe",
+      stunningAxe: "Stunning Axe",
+      heavyAxe: "Heavy Axe",
+      rapier: "Needle Rapier"
+    };
+
+    const CHARACTER_ROSTER = {
+      balancedSwordsman: {
+        name: "Balanced Swordsman",
+        weaponPreset: "sword",
+        weights: { hp: 1, strength: 1, dexterity: 1 },
+        ability: {
+          id: "riposte",
+          name: "Riposte",
+          charges: 1,
+          manaCost: 2,
+          guardReduction: 0.40,
+          pierceGuardReduction: 0.22,
+          counterDamageMultiplier: 0.82,
+          counterTriggers: 1,
+          role: "Brace, reduce incoming damage, then counter the first enemy that hits."
+        },
+        unlocked: true,
+        unlock: "Available from the start.",
+        role: "Reference character: even growth, Iron Sword, and a counter stance."
+      },
+      axeBruiser: {
+        name: "Axe Bruiser",
+        weaponPreset: "heavyAxe",
+        weights: { hp: 0.30, strength: 0.45, dexterity: 0.25 },
+        unlocked: false,
+        unlock: "Rescue the forge prisoner after the level 2 boss.",
+        role: "Strength-leaning fighter with slower, heavier weapon identity."
+      },
+      needleDuelist: {
+        name: "Needle Duelist",
+        weaponPreset: "rapier",
+        weights: { hp: 0.30, strength: 0.25, dexterity: 0.45 },
+        unlocked: false,
+        unlock: "Find the duelist in an evasive enemy biome.",
+        role: "Reliability and crit tempo, paid for with lower bulk."
+      },
+      warder: {
+        name: "Warder",
+        weaponPreset: "sword",
+        weights: { hp: 0.45, strength: 0.30, dexterity: 0.25 },
+        unlocked: false,
+        unlock: "Survive a boss while critically wounded.",
+        role: "Defensive character for players who want a wider HP buffer."
+      }
+    };
+
+    let selectedCharacterId = "balancedSwordsman";
+
+    function activeCharacter() {
+      return CHARACTER_ROSTER[selectedCharacterId] || CHARACTER_ROSTER.balancedSwordsman;
+    }
+
+    function activeAbility() {
+      return activeCharacter().ability || null;
+    }
+
+    function maxManaForPlayer() {
+      return TACTICAL.maxMana;
+    }
+
+    function startingManaForPlayer() {
+      return Math.min(maxManaForPlayer(), TACTICAL.startingMana);
+    }
+
+    function actionManaCost(action) {
+      if (action === "attack") return TACTICAL.attackManaCost;
+      if (action === "heavy") return TACTICAL.heavyManaCost;
+      if (action === "quick") return TACTICAL.quickManaCost;
+      if (action === "sweep") return TACTICAL.sweepManaCost;
+      if (action === "guard") return TACTICAL.guardManaCost;
+      if (action === "ability") return activeAbility()?.manaCost || 0;
+      return 0;
+    }
+
+    function canAffordAction(action) {
+      return (state.player.mana || 0) >= actionManaCost(action);
+    }
+
+    function restoreMana(amount = TACTICAL.manaRegenPerRound) {
+      const before = state.player.mana || 0;
+      state.player.mana = Math.min(state.player.maxMana, before + amount);
+      return state.player.mana - before;
+    }
+
+    function makeStarterWeapon(preset = activeCharacter().weaponPreset) {
+      const weapon = { ...BASE_WEAPON };
+      if (preset === "sword") return weapon;
+      if (preset === "rapier") {
+        weapon.name = "Needle Rapier";
+        weapon.damageMultiplier = 1.02;
+        weapon.heavyDamageMultiplier = 0.88;
+        weapon.quickDamageMultiplier = 1.16;
+        weapon.sweepDamageMultiplier = 1.10;
+        weapon.hitModifier = 0.025;
+        weapon.critModifier = 0.045;
+        weapon.critMultiplierModifier = 0.08;
+        weapon.dexterityMultiplier = 1.06;
+        return weapon;
+      }
+
+      weapon.name = preset === "stunningAxe" ? "Stunning Axe" : preset === "crushingAxe" ? "Crushing Axe" : "Heavy Axe";
+      weapon.damageMultiplier = 1.05;
+      weapon.heavyDamageMultiplier = 1.18;
+      weapon.quickDamageMultiplier = 0.92;
+      weapon.sweepDamageMultiplier = 0.94;
+      weapon.hitModifier = -0.03;
+      weapon.dexterityMultiplier = 0.94;
+      if (preset === "crushingAxe") {
+        weapon.name = "Crushing Axe";
+        weapon.sunderOnHit = 1;
+        weapon.sunderOnHeavyHit = 1;
+        weapon.sunderBonusPerStack = 0.006;
+      } else if (preset === "stunningAxe") {
+        weapon.name = "Stunning Axe";
+        weapon.stunOnHeavyHitChance = 0.18;
+      }
+      return weapon;
+    }
+
+    const ENEMY_CURVE = {
+      baseHp: 8.9,
+      hpGrowth: 1.132,
+      baseDamage: 0.58,
+      damageGrowth: 1.170,
+      baseAccuracy: 0.64,
+      accuracyGrowthPerLevel: 0.020,
+      baseEvasion: 3.7,
+      evasionGrowth: 1.09,
+      bossHpMultiplier: 3.55,
+      bossDamageMultiplier: 2.35,
+      bossAccuracyBonus: 0.07,
+      bossEvasionMultiplier: 1.11
+    };
+
+    const ARCHETYPES = {
+      raider: { name: "Raider", hpFactor: 1.00, damageFactor: 1.00, accuracyDelta: 0.00, evasionFactor: 1.00, tags: ["baseline"] },
+      brute: { name: "Brute", hpFactor: 1.35, damageFactor: 1.18, accuracyDelta: -0.04, evasionFactor: 0.72, tags: ["hp-check"] },
+      duelist: { name: "Duelist", hpFactor: 0.86, damageFactor: 0.96, accuracyDelta: 0.08, evasionFactor: 1.45, tags: ["dex-check"] },
+      stalker: { name: "Stalker", hpFactor: 0.92, damageFactor: 1.28, accuracyDelta: 0.04, evasionFactor: 1.20, tags: ["burst-check"] },
+      mage: { name: "Mage", hpFactor: 0.82, damageFactor: 0.80, accuracyDelta: 0.06, evasionFactor: 1.08, tags: ["mage-support"] }
+    };
+
+    const ORDER = ["raider", "brute", "duelist", "stalker"];
+    const BOSS_ORDER = ["raider", "duelist", "stalker", "brute", "stalker"];
+    const POWER_BANDS = {
+      1: {
+        enemyCount: 1,
+        leadHpFactor: 1.00,
+        leadDamageFactor: 1.00,
+        supportHpFactor: 0,
+        supportDamageFactor: 0,
+        mageChance: 0,
+        mixedSupportChance: 0,
+        leadTags: ["opener"]
+      },
+      2: {
+        enemyCount: 2,
+        leadHpFactor: 0.66,
+        leadDamageFactor: 0.38,
+        supportHpFactor: 0.46,
+        supportDamageFactor: 0.27,
+        mageChance: 0,
+        mixedSupportChance: 0.20,
+        leadTags: []
+      },
+      3: {
+        enemyCount: 2,
+        leadHpFactor: 0.74,
+        leadDamageFactor: 0.44,
+        supportHpFactor: 0.52,
+        supportDamageFactor: 0.31,
+        mageChance: 0.16,
+        mixedSupportChance: 0.34,
+        leadTags: []
+      },
+      4: {
+        enemyCount: 2,
+        leadHpFactor: 0.76,
+        leadDamageFactor: 0.44,
+        supportHpFactor: 0.52,
+        supportDamageFactor: 0.30,
+        mageChance: 0.22,
+        mixedSupportChance: 0.50,
+        leadTags: []
+      },
+      5: {
+        enemyCount: 3,
+        leadHpFactor: 0.68,
+        leadDamageFactor: 0.39,
+        supportHpFactor: 0.34,
+        supportDamageFactor: 0.20,
+        mageChance: 0.24,
+        mixedSupportChance: 0.58,
+        leadTags: ["elite"]
+      }
+    };
+    const SHEET_SCALE = 3;
+    const HTTP_ASSET_MODE = location.protocol === "http:" || location.protocol === "https:";
+    const ITEM_SHEET_URL = HTTP_ASSET_MODE
+      ? "/assets/oryx_items.png"
+      : "file:///Users/damirshamanaev/Downloads/oryx_16-bit_fantasy_1.1/oryx_16bit_fantasy_items_trans.png";
+    const CREATURE_SHEET_URL = HTTP_ASSET_MODE ? "/assets/oryx_creatures.png" : null;
+    const CREATURE_CATALOG = window.ORYX_CREATURE_FX_SEED_CATALOG || { sheets: {}, entries: [] };
+    const CREATURE_ENTRIES = new Map((CREATURE_CATALOG.entries || []).map(entry => [entry.id, entry]));
+    const GAME_ENEMY_VISUALS = window.TACTICAL_ENEMY_VISUALS || { pools: {}, bosses: {} };
+    const ENEMY_VISUAL_POOLS = GAME_ENEMY_VISUALS.pools || {};
+    const BOSS_VISUALS = GAME_ENEMY_VISUALS.bosses || {};
+    const LEVEL_POOL_PROFILE_KEYS = {
+      raider: ["balanced", "elite", "unset"],
+      brute: ["strength", "tank", "hp"],
+      duelist: ["dexterity"],
+      stalker: ["dexterity", "balanced"],
+      mage: ["caster", "support"]
+    };
+
+    function normalizedDungeonLevel(entry) {
+      const level = Number(entry?.dungeon_level);
+      return Number.isInteger(level) && level >= 1 ? level : null;
+    }
+
+    function entryIsBossCandidate(entry) {
+      return entry?.category === "boss_enemy"
+        || entry?.engine_role === "boss_enemy"
+        || (entry?.encounter_roles || []).includes("boss_enemy")
+        || (entry?.tags || []).includes("boss_enemy");
+    }
+
+    function entryIsEnemyCandidate(entry) {
+      if (!entry || entry.sheet !== "creatures" || entry.ignored || entry.category === "hero") return false;
+      const status = entry.runtime_status || entry.status || "candidate";
+      if (status === "rejected") return false;
+      return entryIsBossCandidate(entry)
+        || entry.category === "enemy_candidate"
+        || entry.category === "encounter_enemy"
+        || entry.category === "elite_enemy"
+        || entry.engine_role === "encounter_enemy"
+        || (entry.encounter_roles || []).includes("encounter_enemy")
+        || (entry.tags || []).includes("enemy_candidate");
+    }
+
+    const LEVEL_ASSIGNED_ENEMIES = (CREATURE_CATALOG.entries || []).reduce((byLevel, entry) => {
+      const level = normalizedDungeonLevel(entry);
+      if (!level || !entryIsEnemyCandidate(entry)) return byLevel;
+      if (!byLevel.has(level)) byLevel.set(level, []);
+      byLevel.get(level).push(entry);
+      return byLevel;
+    }, new Map());
+
+    const SPRITES = {
+      hp: { col: 19, row: 4 },
+      strength: { col: 12, row: 4 },
+      dexterity: { col: 17, row: 4 },
+      potion: { col: 9, row: 1 },
+      crimsonVial: { col: 3, row: 1 },
+      crimsonPotion: { col: 9, row: 1 },
+      crimsonElixir: { col: 15, row: 1 },
+      sword: { col: 22, row: 10 },
+      axe: { col: 14, row: 8 },
+      rapier: { col: 9, row: 10 }
+    };
+
+    const ITEM_CATALOG = window.ORYX_SEED_CATALOG || { items: [] };
+    const WEAPON_FAMILY_STYLE = {
+      axe: "axe",
+      hammer: "axe",
+      mace: "axe",
+      stick: "axe",
+      cane: "axe",
+      sword: "sword",
+      saber: "sword",
+      dagger: "rapier",
+      spear: "rapier",
+      bow: "rapier",
+      crossbow: "rapier",
+      staff: "rapier",
+      wand: "rapier",
+      rod: "rapier"
+    };
+    const SUPPORTED_MAPPED_WEAPON_EFFECTS = new Set([
+      "weapon_damage",
+      "strength",
+      "dexterity",
+      "hit_chance",
+      "crit_chance",
+      "crit_damage",
+      "damage_roll_quality",
+      "double_strike",
+      "stagger",
+      "on_hit_burn",
+      "on_hit_poison",
+      "on_hit_freeze",
+      "on_hit_shock",
+      "boss_damage",
+      "execute_damage",
+      "first_strike",
+      "max_hp"
+    ]);
+    const MAPPED_WEAPON_TEMPLATES = (ITEM_CATALOG.items || [])
+      .filter(item => item.slot === "weapon" && item.sprite)
+      .map(item => {
+        const family = item.visual?.family || "weapon";
+        const style = WEAPON_FAMILY_STYLE[family];
+        const effects = (item.power_recipe || [])
+          .filter(entry => SUPPORTED_MAPPED_WEAPON_EFFECTS.has(entry.effect) && Number(entry.weight) > 0)
+          .map(entry => ({ effect: entry.effect, weight: Number(entry.weight) }));
+        return {
+          assetId: item.id,
+          name: item.name || family,
+          family,
+          style,
+          tags: item.tags || [],
+          effects,
+          sprite: { col: item.sprite.tile_col, row: item.sprite.tile_row }
+        };
+      })
+      .filter(item => item.style && item.effects.length);
+
+    function createDebugState() {
+      return {
+        actions: { attack: 0, heavy: 0, quick: 0, sweep: 0, guard: 0, ability: 0 },
+        damageDealt: 0,
+        damageTaken: 0,
+        roomsCleared: 0,
+        lootEquipped: 0,
+        lootSkipped: 0,
+        lootConsumed: 0,
+        lootHistory: []
+      };
+    }
+
+    const state = {
+      roomIndex: 0,
+      phase: "combat",
+      round: 1,
+      selected: 0,
+      player: {
+        maxHp: STATS.baseHp,
+        hp: STATS.baseHp,
+        maxMana: maxManaForPlayer(),
+        mana: startingManaForPlayer(),
+        strength: STATS.baseStrength,
+        dexterity: STATS.baseDexterity,
+        startingWeapon: makeStarterWeapon(),
+        weapon: makeStarterWeapon(),
+        abilityCharges: activeAbility()?.charges || 0,
+        items: [],
+        stash: [],
+        consumed: 0
+      },
+      trainingBudget: DUNGEON.initialStatBudget,
+      levelPool: null,
+      enemies: [],
+      draft: [],
+      log: [],
+      debug: createDebugState()
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    const HUMAN = {
+      chanceStep: 0.05,
+      powerLabels: {
+        1: "Low",
+        2: "Standard",
+        3: "Dangerous",
+        4: "Elite",
+        5: "Deadly"
+      }
+    };
+
+    function clamp(value, lower, upper) {
+      return Math.max(lower, Math.min(upper, value));
+    }
+
+    function fmt(value, digits = 1) {
+      return Number.isFinite(value) ? value.toFixed(digits) : "0.0";
+    }
+
+    function whole(value) {
+      return Number.isFinite(value) ? Math.round(value) : 0;
+    }
+
+    function humanHp(value) {
+      return String(Math.max(0, whole(value)));
+    }
+
+    function humanMana(value) {
+      return String(Math.max(0, whole(value)));
+    }
+
+    function humanStat(value) {
+      return String(Math.max(0, whole(value)));
+    }
+
+    function humanGain(value) {
+      const rounded = whole(Math.abs(value));
+      const shown = value !== 0 && rounded === 0 ? 1 : rounded;
+      return `${value < 0 ? "-" : "+"}${shown}`;
+    }
+
+    function humanDamage(value) {
+      if (!Number.isFinite(value) || value <= 0) return "0";
+      if (value < 1) return "<1";
+      return String(whole(value));
+    }
+
+    function humanDamageRange(value) {
+      if (!Number.isFinite(value) || value <= 0) return "0";
+      const low = Math.max(0, Math.floor(value * (1 - COMBAT.damageVariance)));
+      const high = Math.max(low + 1, Math.ceil(value * (1 + COMBAT.damageVariance)));
+      return low === high ? String(low) : `${low}-${high}`;
+    }
+
+    function humanChance(value) {
+      const stepped = Math.round(clamp(value, 0, 1) / HUMAN.chanceStep) * HUMAN.chanceStep;
+      return `${whole(stepped * 100)}%`;
+    }
+
+    function powerBandLabel(powerLevel) {
+      return powerLevel ? `P${powerLevel} ${HUMAN.powerLabels[powerLevel] || "Room"}` : "Room";
+    }
+
+    function roomKindLabel(room) {
+      if (!room) return "Cleared";
+      return room.isBoss ? "Boss" : `${powerBandLabel(room.powerLevel)} Encounter`;
+    }
+
+    function pct(value) {
+      return humanChance(value);
+    }
+
+    function pctDetail(value) {
+      return `${fmt(value * 100, 1)}%`;
+    }
+
+    function actionLogName(action) {
+      if (action === "ability") return activeAbility()?.name || "ability";
+      if (action === "heavy" && (state.player.weapon.sunderOnHit || state.player.weapon.stunOnHeavyHitChance)) {
+        return "slam";
+      }
+      return action;
+    }
+
+    function log(text, cls = "") {
+      state.log.push({ text, cls });
+      state.log = state.log.slice(-80);
+    }
+
+    function itemStorageScore(item) {
+      const rarityBonus = {
+        common: 0,
+        uncommon: 0.10,
+        rare: 0.25,
+        "very rare": 0.40,
+        epic: 0.60,
+        legendary: 0.90,
+        unique: 1.15
+      }[item.rarity || "common"] || 0;
+      return (item.power || 0) + rarityBonus;
+    }
+
+    function slotForItem(item) {
+      if (!item) return null;
+      if (item.slot) return item.slot;
+      if (item.kind === "weapon") return "weapon";
+      if (item.kind === "consumable") return "consumable";
+      if (item.kind === "stat") {
+        if (item.stat === "hp") return "amulet";
+        if (item.stat === "dexterity") return "relic";
+        return "charm";
+      }
+      return item.kind;
+    }
+
+    function activeItemForSlot(slot) {
+      return state.player.items.find(item => slotForItem(item) === slot) || null;
+    }
+
+    function baseStatsFromTraining() {
+      const weights = activeCharacter().weights;
+      const total = weights.hp + weights.strength + weights.dexterity;
+      const budget = Math.max(0, state.trainingBudget || 0);
+      return {
+        maxHp: STATS.baseHp + budget * (weights.hp / total) * STATS.hpPerPower,
+        strength: STATS.baseStrength + budget * (weights.strength / total) * STATS.strengthPerPower,
+        dexterity: STATS.baseDexterity + budget * (weights.dexterity / total) * STATS.dexterityPerPower
+      };
+    }
+
+    function trainingGainAfterRoom(room) {
+      if (!room || (room.isBoss && room.level >= DUNGEON.levels)) return 0;
+      const baseGain = room.isBoss
+        ? DUNGEON.statBudgetGainPerLevel
+        : DUNGEON.statBudgetGainPerEncounter;
+      return baseGain * Math.pow(DUNGEON.statBudgetGainGrowth, room.level - 1) * LOOT.trainingGainMultiplier;
+    }
+
+    function applyTrainingGain(room) {
+      const gain = trainingGainAfterRoom(room);
+      if (gain <= 0) return;
+      const oldMaxHp = state.player.maxHp;
+      state.trainingBudget += gain;
+      recalculatePlayerFromGear(oldMaxHp, DUNGEON.currentHpFromMaxHpGainFraction);
+    }
+
+    function applyPassiveRoomHealing(room) {
+      if (DUNGEON.postEncounterHealFraction > 0) {
+        state.player.hp = Math.min(
+          state.player.maxHp,
+          state.player.hp + state.player.maxHp * DUNGEON.postEncounterHealFraction
+        );
+      }
+      if (room.isBoss && room.level < DUNGEON.levels && DUNGEON.postLevelHealFraction > 0) {
+        state.player.hp = Math.min(
+          state.player.maxHp,
+          state.player.hp + state.player.maxHp * DUNGEON.postLevelHealFraction
+        );
+      }
+    }
+
+    function itemPolicyScore(item) {
+      if (!item) return 0;
+      if (item.kind === "stat") {
+        if (item.stat === "hp") return item.value / STATS.hpPerPower * 0.45;
+        if (item.stat === "strength") return item.value / STATS.strengthPerPower * 0.45;
+        if (item.stat === "dexterity") return item.value / STATS.dexterityPerPower * 0.10;
+      }
+      if (item.kind === "weapon") {
+        return (item.weapon.damageMultiplier - 1) * 12 * 0.45
+          + (item.weapon.heavyDamageMultiplier - 1) * 8 * 0.45
+          + (item.weapon.quickDamageMultiplier - 1) * 5 * 0.10
+          + (item.weapon.sweepDamageMultiplier - 1) * 5 * 0.10
+          + item.weapon.hitModifier * 10 * 0.10
+          + item.weapon.critModifier * 8 * 0.10
+          + item.weapon.critMultiplierModifier * 5 * 0.10
+          + (item.weapon.dexterityMultiplier - 1) * 8 * 0.10
+          + (item.weapon.sunderOnHit || 0) * 0.35 * 0.45
+          + (item.weapon.sunderOnHeavyHit || 0) * 0.45 * 0.45
+          + (item.weapon.sunderBonusPerStack || 0) * 8 * 0.45
+          + (item.weapon.stunOnHeavyHitChance || 0) * 4 * 0.45
+          + (item.weapon.damageQualityModifier || 0) * 5 * 0.10
+          + (item.weapon.doubleStrikeChanceModifier || 0) * 6 * 0.10
+          + (item.weapon.staggerOnHitChance || 0) * 5 * 0.45
+          + (item.weapon.freezeOnHitChance || 0) * 5 * 0.10
+          + (item.weapon.onHitBonusDamage || 0) * 7
+          + ((item.weapon.bossDamageMultiplier || 1) - 1) * 5
+          + ((item.weapon.executeDamageMultiplier || 1) - 1) * 4
+          + ((item.weapon.firstStrikeDamageMultiplier || 1) - 1) * 4
+          + ((item.statBonus?.hp || 0) / STATS.hpPerPower) * 0.45
+          + ((item.statBonus?.strength || 0) / STATS.strengthPerPower) * 0.45
+          + ((item.statBonus?.dexterity || 0) / STATS.dexterityPerPower) * 0.10;
+      }
+      return 0;
+    }
+
+    function lootChoiceScore(item) {
+      if (!item) return 0;
+      if (item.kind === "consumable") {
+        const missing = Math.max(0, state.player.maxHp - state.player.hp);
+        const effective = Math.min(missing, item.value);
+        const urgency = 1 + Math.min(1, missing / Math.max(1, state.player.maxHp)) * 0.65;
+        return effective / STATS.hpPerPower * 0.45 * urgency;
+      }
+      const rawScore = itemPolicyScore(item);
+      const replaced = activeItemForSlot(slotForItem(item));
+      return rawScore - itemPolicyScore(replaced);
+    }
+
+    function addToStash(item) {
+      if (!item || item.kind === "consumable") return;
+      state.player.stash.push(item);
+      state.player.stash.sort((a, b) => itemStorageScore(b) - itemStorageScore(a));
+      log(`Stashed ${item.name}.`);
+      while (state.player.stash.length > LOOT.stashSlotLimit) {
+        const lost = state.player.stash.pop();
+        log(`Lost ${lost.name}.`, "bad");
+      }
+    }
+
+    function recalculatePlayerFromGear(oldMaxHp = state.player.maxHp, hpGainFraction = 1) {
+      const baseStats = baseStatsFromTraining();
+      state.player.maxHp = baseStats.maxHp;
+      state.player.strength = baseStats.strength;
+      state.player.dexterity = baseStats.dexterity;
+      const weaponItem = state.player.items.find(item => item.kind === "weapon");
+      state.player.weapon = weaponItem ? weaponItem.weapon : { ...(state.player.startingWeapon || BASE_WEAPON) };
+
+      state.player.items.forEach(item => {
+        if (item.kind === "stat") {
+          if (item.stat === "hp") state.player.maxHp += item.value;
+          if (item.stat === "strength") state.player.strength += item.value;
+          if (item.stat === "dexterity") state.player.dexterity += item.value;
+        }
+        if (item.statBonus) {
+          state.player.maxHp += item.statBonus.hp || 0;
+          state.player.strength += item.statBonus.strength || 0;
+          state.player.dexterity += item.statBonus.dexterity || 0;
+        }
+      });
+      state.player.dexterity *= state.player.weapon.dexterityMultiplier || 1;
+
+      const maxHpGain = Math.max(0, state.player.maxHp - oldMaxHp);
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + maxHpGain * hpGainFraction);
+    }
+
+    function equipWearableItem(item) {
+      const oldMaxHp = state.player.maxHp;
+      let active = [...state.player.items];
+      const removed = [];
+      const slot = slotForItem(item);
+
+      const replaced = active.filter(activeItem => slotForItem(activeItem) === slot);
+      active = active.filter(activeItem => slotForItem(activeItem) !== slot);
+      removed.push(...replaced);
+
+      active.push(item);
+
+      while (active.length > LOOT.wearableSlotLimit) {
+        let candidates = active.filter(activeItem => activeItem !== item);
+        if (item.kind !== "weapon") {
+          const nonWeapon = candidates.filter(activeItem => activeItem.kind !== "weapon");
+          if (nonWeapon.length) candidates = nonWeapon;
+        }
+        if (!candidates.length) candidates = active;
+        const dropped = candidates.reduce((weakest, activeItem) =>
+          itemStorageScore(activeItem) < itemStorageScore(weakest) ? activeItem : weakest
+        );
+        active = active.filter(activeItem => activeItem !== dropped);
+        removed.push(dropped);
+      }
+
+      state.player.items = active;
+      removed.forEach(addToStash);
+      recalculatePlayerFromGear(oldMaxHp);
+    }
+
+    function creatureEntry(id) {
+      return id ? CREATURE_ENTRIES.get(id) : null;
+    }
+
+    function legacyVisualPool(key) {
+      return (ENEMY_VISUAL_POOLS[key] || []).map(creatureEntry).filter(Boolean);
+    }
+
+    function levelVisualPool(level, key) {
+      const assigned = LEVEL_ASSIGNED_ENEMIES.get(level) || [];
+      if (!assigned.length) return legacyVisualPool(key);
+      const regular = assigned.filter(entry => !entryIsBossCandidate(entry));
+      const scoped = regular.length ? regular : assigned;
+      const profiles = LEVEL_POOL_PROFILE_KEYS[key] || [];
+      const matched = scoped.filter(entry => profiles.includes(entry.combat_profile || "unset"));
+      return matched.length ? matched : scoped;
+    }
+
+    function bossVisualPool(level) {
+      const assigned = LEVEL_ASSIGNED_ENEMIES.get(level) || [];
+      if (!assigned.length) {
+        const boss = creatureEntry(BOSS_VISUALS[level]);
+        return boss ? [boss] : [];
+      }
+      const bosses = assigned.filter(entryIsBossCandidate);
+      return bosses.length ? bosses : assigned;
+    }
+
+    function visualForEnemy(level, key, isBoss, variant = 0) {
+      const pool = isBoss ? bossVisualPool(level) : levelVisualPool(level, key);
+      if (!pool.length) return null;
+      return pool[(level * 7 + variant) % pool.length];
+    }
+
+    function visualFrame(entry) {
+      return entry?.animation?.frames?.[0] || entry?.sprite || null;
+    }
+
+    function randomVisualVariant(level, slot) {
+      return Math.floor(Math.random() * 10000) + level * 100 + slot;
+    }
+
+    function bossArchetypeKey(level) {
+      return BOSS_ORDER[(level - 1) % BOSS_ORDER.length];
+    }
+
+    function weightedChoiceFromMap(weightsByKey) {
+      const entries = Object.entries(weightsByKey).filter(([, weight]) => weight > 0);
+      const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+      let roll = Math.random() * total;
+      for (const [key, weight] of entries) {
+        roll -= weight;
+        if (roll <= 0) return key;
+      }
+      return entries[entries.length - 1]?.[0] || ORDER[0];
+    }
+
+    function powerProfileWeights(powerLevel, level) {
+      const lateBias = Math.max(0, level - 1) * 0.06;
+      if (powerLevel <= 1) {
+        return { raider: 1.25, duelist: 0.85, brute: 0.12, stalker: 0.12 };
+      }
+      if (powerLevel === 2) {
+        return { raider: 0.95, duelist: 0.95, brute: 0.72 + lateBias, stalker: 0.58 + lateBias };
+      }
+      if (powerLevel === 3) {
+        return { raider: 0.42, duelist: 0.95, brute: 0.95 + lateBias, stalker: 0.88 + lateBias };
+      }
+      if (powerLevel === 4) {
+        return { raider: 0.18, duelist: 0.85, brute: 1.12 + lateBias, stalker: 1.05 + lateBias };
+      }
+      return { raider: 0.08, duelist: 0.64, brute: 1.25 + lateBias, stalker: 1.20 + lateBias };
+    }
+
+    function encounterPowerLevel(level, slot) {
+      if (level === 1 && slot === 0) return 1;
+      const slotCount = Math.max(1, DUNGEON.encountersPerLevel - 1);
+      let power = 1 + Math.floor((slot / slotCount) * 3) + Math.floor(Math.max(0, level - 2) / 2);
+      if (Math.random() < 0.24) {
+        power += Math.random() < 0.5 ? -1 : 1;
+      }
+      return Math.round(clamp(power, 1, Math.min(5, level + 2)));
+    }
+
+    function supportArchetypeKey(leadKey, band, powerLevel) {
+      if (Math.random() >= band.mixedSupportChance) return leadKey;
+      const weights = powerProfileWeights(powerLevel, 1);
+      weights[leadKey] = 0;
+      return weightedChoiceFromMap(weights);
+    }
+
+    function normalizedTags(tags) {
+      if (!tags) return [];
+      return Array.isArray(tags) ? tags : [tags];
+    }
+
+    function taggedEnemy(enemy, tags) {
+      return {
+        ...enemy,
+        tags: [...enemy.tags, ...normalizedTags(tags)]
+      };
+    }
+
+    function makeEnemy(level, key, isBoss, variant = 0) {
+      const arch = ARCHETYPES[key];
+      const levelIndex = level - 1;
+      let maxHp = ENEMY_CURVE.baseHp * Math.pow(ENEMY_CURVE.hpGrowth, levelIndex) * arch.hpFactor;
+      let damage = ENEMY_CURVE.baseDamage * Math.pow(ENEMY_CURVE.damageGrowth, levelIndex) * arch.damageFactor;
+      let accuracy = ENEMY_CURVE.baseAccuracy + ENEMY_CURVE.accuracyGrowthPerLevel * levelIndex + arch.accuracyDelta;
+      let evasion = ENEMY_CURVE.baseEvasion * Math.pow(ENEMY_CURVE.evasionGrowth, levelIndex) * arch.evasionFactor;
+      const visual = visualForEnemy(level, key, isBoss, variant);
+      const visualName = visual?.name || arch.name;
+      const tags = [...arch.tags];
+      let name = `L${level} ${visualName}`;
+      if (isBoss) {
+        maxHp *= ENEMY_CURVE.bossHpMultiplier;
+        damage *= ENEMY_CURVE.bossDamageMultiplier;
+        accuracy += ENEMY_CURVE.bossAccuracyBonus;
+        evasion *= ENEMY_CURVE.bossEvasionMultiplier;
+        tags.push("boss");
+        name = `L${level} Boss ${visualName}`;
+      }
+      return {
+        name,
+        level,
+        archetype: key,
+        visualId: visual?.id || "",
+        visualFrame: visualFrame(visual),
+        maxHp: Number(maxHp.toFixed(2)),
+        hp: Number(maxHp.toFixed(2)),
+        damage: Number(damage.toFixed(2)),
+        accuracy: clamp(accuracy, 0.35, 0.92),
+        evasion: Number(evasion.toFixed(2)),
+        tags,
+        intent: "strike",
+        aimed: false,
+        interrupted: false,
+        sunder: 0,
+        shield: 0,
+        shieldTurns: 0,
+        invisible: false,
+        invisibleTurns: 0
+      };
+    }
+
+    function scaleEnemy(enemy, suffix, hpFactor, damageFactor, accuracyDelta, evasionFactor, tags) {
+      return {
+        ...enemy,
+        name: `${enemy.name} ${suffix}`,
+        maxHp: Number((enemy.maxHp * hpFactor).toFixed(2)),
+        hp: Number((enemy.maxHp * hpFactor).toFixed(2)),
+        damage: Number((enemy.damage * damageFactor).toFixed(2)),
+        accuracy: clamp(enemy.accuracy + accuracyDelta, 0.35, 0.92),
+        evasion: Number((enemy.evasion * evasionFactor).toFixed(2)),
+        tags: [...enemy.tags, ...normalizedTags(tags)],
+        aimed: false,
+        interrupted: false,
+        sunder: 0,
+        shield: 0,
+        shieldTurns: 0,
+        invisible: false,
+        invisibleTurns: 0
+      };
+    }
+
+    function buildPowerRoom(level, slot) {
+      const powerLevel = encounterPowerLevel(level, slot);
+      const band = POWER_BANDS[powerLevel];
+      const powerTags = [`power-${powerLevel}`];
+      const leadKey = weightedChoiceFromMap(powerProfileWeights(powerLevel, level));
+      if (band.enemyCount === 1) {
+        return {
+          level,
+          isBoss: false,
+          powerLevel,
+          enemies: [
+            taggedEnemy(
+              makeEnemy(level, leadKey, false, randomVisualVariant(level, slot)),
+              [...band.leadTags, ...powerTags]
+            )
+          ]
+        };
+      }
+
+      const lead = scaleEnemy(
+        makeEnemy(level, leadKey, false, randomVisualVariant(level, slot * 2)),
+        "Lead",
+        band.leadHpFactor,
+        band.leadDamageFactor,
+        0,
+        1,
+        ["group-primary", ...band.leadTags, ...powerTags]
+      );
+      const enemies = [lead];
+
+      for (let supportIndex = 1; supportIndex < band.enemyCount; supportIndex += 1) {
+        const supportKey = supportArchetypeKey(leadKey, band, powerLevel);
+        const useMage = level >= 2 && Math.random() < band.mageChance;
+        const support = makeEnemy(level, supportKey, false, randomVisualVariant(level, slot * 3 + supportIndex));
+        if (useMage) {
+          enemies.push(scaleEnemy(
+            support,
+            "Mage",
+            TACTICAL.mageSupportHpFactor,
+            TACTICAL.mageSupportDamageFactor,
+            TACTICAL.mageSupportAccuracyDelta,
+            TACTICAL.mageSupportEvasionFactor,
+            ["group-support", "mage-support", ...powerTags]
+          ));
+        } else {
+          const sizeFactor = supportIndex > 1 ? 0.88 : 1;
+          enemies.push(scaleEnemy(
+            support,
+            "Support",
+            band.supportHpFactor * sizeFactor,
+            band.supportDamageFactor * sizeFactor,
+            0.03,
+            1.08,
+            ["group-support", ...powerTags]
+          ));
+        }
+      }
+
+      return { level, isBoss: false, powerLevel, enemies };
+    }
+
+    function buildDungeon() {
+      const rooms = [];
+      for (let level = 1; level <= DUNGEON.levels; level += 1) {
+        for (let slot = 0; slot < DUNGEON.encountersPerLevel; slot += 1) {
+          rooms.push(buildPowerRoom(level, slot));
+        }
+        const bossKey = bossArchetypeKey(level);
+        rooms.push({ level, isBoss: true, enemies: [makeEnemy(level, bossKey, true, level)] });
+      }
+      return rooms;
+    }
+
+    let dungeon = [];
+
+    function indexPriority(index, casterIndex) {
+      return index === casterIndex ? 0 : 1;
+    }
+
+    function supportHealTarget(enemies, casterIndex) {
+      const candidates = enemies
+        .map((enemy, index) => ({ enemy, index }))
+        .filter(({ enemy, index }) =>
+          index !== casterIndex
+          && enemy.hp > 0
+          && enemy.hp < enemy.maxHp * TACTICAL.supportHealThreshold
+        );
+      if (!candidates.length) return null;
+      return candidates.reduce((best, current) =>
+        (current.enemy.maxHp - current.enemy.hp) > (best.enemy.maxHp - best.enemy.hp) ? current : best
+      ).index;
+    }
+
+    function supportShieldTarget(enemies, casterIndex) {
+      const candidates = enemies
+        .map((enemy, index) => ({ enemy, index }))
+        .filter(({ enemy }) =>
+          enemy.hp > 0
+          && (enemy.shield || 0) < enemy.maxHp * TACTICAL.supportShieldMaxHpFraction
+        );
+      if (!candidates.length) return null;
+      return candidates.reduce((best, current) => {
+        const bestScore = [
+          indexPriority(best.index, casterIndex),
+          best.enemy.maxHp * TACTICAL.supportShieldMaxHpFraction - (best.enemy.shield || 0)
+        ];
+        const currentScore = [
+          indexPriority(current.index, casterIndex),
+          current.enemy.maxHp * TACTICAL.supportShieldMaxHpFraction - (current.enemy.shield || 0)
+        ];
+        return currentScore[0] > bestScore[0] || (currentScore[0] === bestScore[0] && currentScore[1] > bestScore[1])
+          ? current
+          : best;
+      }).index;
+    }
+
+    function supportInvisibilityTarget(enemies, casterIndex) {
+      const candidates = enemies
+        .map((enemy, index) => ({ enemy, index }))
+        .filter(({ enemy }) => enemy.hp > 0 && !enemy.invisible);
+      if (!candidates.length) return null;
+      return candidates.reduce((best, current) => {
+        const bestScore = [indexPriority(best.index, casterIndex), best.enemy.maxHp - best.enemy.hp];
+        const currentScore = [indexPriority(current.index, casterIndex), current.enemy.maxHp - current.enemy.hp];
+        return currentScore[0] > bestScore[0] || (currentScore[0] === bestScore[0] && currentScore[1] > bestScore[1])
+          ? current
+          : best;
+      }).index;
+    }
+
+    function weightedIntentChoice(candidates) {
+      const total = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+      let roll = Math.random() * total;
+      for (const candidate of candidates) {
+        roll -= candidate.weight;
+        if (roll <= 0) return candidate.intent;
+      }
+      return candidates[candidates.length - 1]?.intent || "strike";
+    }
+
+    function chooseIntent(enemy, round, allies = state.enemies, casterIndex = state.enemies.indexOf(enemy)) {
+      const tags = new Set(enemy.tags);
+      if (tags.has("boss")) {
+        return ["heavy", "strike", "pierce", "aim", "heavy", "strike"][(round - 1) % 6];
+      }
+      if (tags.has("mage-support")) {
+        const candidates = [
+          { intent: "shield", weight: 0.30 },
+          { intent: "invisibility", weight: 0.20 },
+          { intent: "strike", weight: 0.22 },
+          { intent: "aim", weight: 0.10 }
+        ];
+        if (supportHealTarget(allies, casterIndex) !== null) {
+          candidates.unshift({ intent: "heal", weight: 0.34 });
+        }
+        return weightedIntentChoice(candidates.filter(candidate => {
+          if (candidate.intent === "shield") return supportShieldTarget(allies, casterIndex) !== null;
+          if (candidate.intent === "invisibility") return supportInvisibilityTarget(allies, casterIndex) !== null;
+          return true;
+        }));
+      }
+      const roll = Math.random();
+      if (tags.has("hp-check")) {
+        if (roll < 0.42) return "heavy";
+        if (roll < 0.80) return "strike";
+        return "guard";
+      }
+      if (tags.has("dex-check")) {
+        if (roll < 0.34) return "pierce";
+        if (roll < 0.68) return "strike";
+        if (roll < 0.90) return "aim";
+        return "guard";
+      }
+      if (tags.has("burst-check")) {
+        if (roll < 0.38) return "strike";
+        if (roll < 0.66) return "pierce";
+        if (roll < 0.88) return "heavy";
+        return "aim";
+      }
+      if (roll < 0.50) return "strike";
+      if (roll < 0.72) return "heavy";
+      if (roll < 0.88) return "guard";
+      return "aim";
+    }
+
+    function startRoom() {
+      const room = dungeon[state.roomIndex];
+      if (!room) {
+        state.phase = "won";
+        log("Dungeon cleared.", "good");
+        render();
+        return;
+      }
+      if (!state.levelPool || state.levelPool.level !== room.level) {
+        state.levelPool = {
+          level: room.level,
+          remaining: LOOT.baseLuckPool * Math.pow(LOOT.luckPoolGrowth, room.level - 1)
+        };
+      }
+      state.phase = "combat";
+      state.round = 1;
+      state.selected = 0;
+      state.player.maxMana = maxManaForPlayer();
+      state.player.mana = startingManaForPlayer();
+      state.player.abilityCharges = activeAbility()?.charges || 0;
+      state.enemies = room.enemies.map(enemy => ({
+        ...enemy,
+        hp: enemy.maxHp,
+        intent: "strike",
+        aimed: false,
+        interrupted: false,
+        sunder: 0,
+        shield: 0,
+        shieldTurns: 0,
+        invisible: false,
+        invisibleTurns: 0
+      }));
+      state.enemies.forEach((enemy, index) => {
+        enemy.intent = chooseIntent(enemy, 1, state.enemies, index);
+      });
+      const powerText = room.powerLevel ? ` · ${powerBandLabel(room.powerLevel)}` : "";
+      log(`Entered R${state.roomIndex + 1}: ${room.isBoss ? "Boss" : "Encounter"}${powerText}.`);
+      render();
+    }
+
+    function playerBaseDamage() {
+      return Math.max(0, COMBAT.basePlayerDamage + COMBAT.strengthDamageScale * Math.pow(Math.max(0, state.player.strength), COMBAT.strengthDamageExponent)) * state.player.weapon.damageMultiplier;
+    }
+
+    function heavyEvasionHitPenalty(enemy) {
+      return clamp(
+        (enemy.evasion - TACTICAL.heavyEvasionHitPenaltyFloor) * TACTICAL.heavyEvasionHitPenaltyScale,
+        0,
+        TACTICAL.heavyEvasionHitPenaltyMax
+      );
+    }
+
+    function playerHitChance(enemy, action) {
+      const dexBonus = COMBAT.dexterityHitScale * Math.pow(Math.max(0, state.player.dexterity), COMBAT.dexterityHitExponent);
+      const evasionPenalty = COMBAT.enemyEvasionHitScale * Math.pow(Math.max(0, enemy.evasion), COMBAT.enemyEvasionExponent);
+      let value = COMBAT.basePlayerHitChance + dexBonus - evasionPenalty + state.player.weapon.hitModifier;
+      if (action === "heavy") value += TACTICAL.heavyHitModifier - heavyEvasionHitPenalty(enemy);
+      if (action === "quick") value += TACTICAL.quickHitModifier;
+      if (action === "sweep") value += TACTICAL.sweepHitModifier;
+      if (enemy.invisible) value -= TACTICAL.supportInvisibilityHitPenalty;
+      return clamp(value, COMBAT.minPlayerHitChance, COMBAT.maxPlayerHitChance);
+    }
+
+    function playerCritChance(enemy, action) {
+      const dexBonus = COMBAT.dexterityCritScale * Math.pow(Math.max(0, state.player.dexterity), COMBAT.dexterityCritExponent);
+      const evasionPenalty = COMBAT.enemyEvasionCritScale * Math.sqrt(Math.max(0, enemy.evasion));
+      let value = COMBAT.baseCritChance + dexBonus - evasionPenalty + state.player.weapon.critModifier;
+      if (action === "quick") value += TACTICAL.quickCritModifier;
+      return clamp(value, 0, COMBAT.maxCritChance);
+    }
+
+    function playerDamageQuality(enemy, action) {
+      const dexBonus = COMBAT.dexterityDamageQualityScale * Math.pow(Math.max(0, state.player.dexterity), COMBAT.dexterityDamageQualityExponent);
+      const evasionPenalty = COMBAT.enemyEvasionDamageQualityScale * Math.pow(Math.max(0, enemy.evasion), COMBAT.enemyEvasionDamageQualityExponent);
+      const quick = action === "quick" ? TACTICAL.quickQualityBonus : 0;
+      const sweep = action === "sweep" ? TACTICAL.sweepQualityBonus : 0;
+      return clamp(dexBonus - evasionPenalty + quick + sweep + (state.player.weapon.damageQualityModifier || 0), 0, 1);
+    }
+
+    function variedDamage(base, quality = 0) {
+      const low = 1 - COMBAT.damageVariance;
+      const high = 1 + COMBAT.damageVariance;
+      const roll = low + Math.random() * COMBAT.damageVariance * 2;
+      return base * (roll + (high - roll) * clamp(quality, 0, 1));
+    }
+
+    function enemyIntentDamage(enemy) {
+      const map = {
+        strike: TACTICAL.strikeDamageMultiplier,
+        heavy: TACTICAL.heavyIntentDamageMultiplier,
+        pierce: TACTICAL.pierceDamageMultiplier,
+        guard: 0,
+        aim: 0,
+        heal: 0,
+        shield: 0,
+        invisibility: 0
+      };
+      let multiplier = map[enemy.intent] || 0;
+      if (enemy.aimed && multiplier > 0) multiplier += TACTICAL.aimDamageBonus;
+      return enemy.damage * multiplier;
+    }
+
+    function doubleStrikeChance() {
+      return clamp(
+        TACTICAL.doubleStrikeBaseChance
+        + state.player.dexterity * TACTICAL.doubleStrikePerDexterity
+        + (state.player.weapon.doubleStrikeChanceModifier || 0),
+        0,
+        TACTICAL.maxDoubleStrikeChance
+      );
+    }
+
+    function interruptChance() {
+      return clamp(TACTICAL.quickInterruptBaseChance + state.player.dexterity * TACTICAL.quickInterruptPerDexterity, 0, TACTICAL.maxInterruptChance);
+    }
+
+    function abilityHasCharges() {
+      return Boolean(activeAbility()) && (state.player.abilityCharges || 0) > 0;
+    }
+
+    function abilityAvailable() {
+      return abilityHasCharges() && canAffordAction("ability");
+    }
+
+    function ripostePriorityEnemy(enemy) {
+      return Boolean(enemy?.tags?.some(tag => ["boss", "elite", "tank", "hp-check"].includes(tag)));
+    }
+
+    function riposteAutoAvailable(enemies = state.enemies) {
+      const ability = activeAbility();
+      if (!abilityAvailable()) return false;
+      if ((ability?.manaCost || 0) <= 0) return true;
+      return enemies.some(enemy => enemy.hp > 0 && ripostePriorityEnemy(enemy));
+    }
+
+    function abilityGuardReduction(enemy) {
+      const ability = activeAbility();
+      if (!ability) return 0;
+      if (enemy.intent === "pierce") return ability.pierceGuardReduction ?? TACTICAL.pierceGuardReduction;
+      return ability.guardReduction || 0;
+    }
+
+    function abilityComment(ability = activeAbility()) {
+      if (!ability) return "No class ability learned.";
+      const normal = pct(ability.guardReduction || 0);
+      const pierce = pct(ability.pierceGuardReduction ?? TACTICAL.pierceGuardReduction);
+      return `Riposte: ${normal} less incoming · counter once · ${pierce} vs pierce`;
+    }
+
+    function quickPressureNote(target) {
+      if (target?.intent === "heavy") return "Pressure: interrupt Heavy · double strike";
+      if (target?.tags?.includes("boss")) return "Pressure: reliable boss poke · double strike";
+      return "Pressure: reliable tempo · double strike";
+    }
+
+    function actionDamageMultiplier(action) {
+      if (action === "heavy") return TACTICAL.heavyDamageMultiplier * (state.player.weapon.heavyDamageMultiplier || 1);
+      if (action === "quick") return TACTICAL.quickDamageMultiplier * (state.player.weapon.quickDamageMultiplier || 1);
+      if (action === "sweep") {
+        const dexterityBonus = clamp(
+          (state.player.dexterity - STATS.baseDexterity) * TACTICAL.sweepDexterityDamagePerPoint,
+          0,
+          TACTICAL.sweepMaxDexterityDamageBonus
+        );
+        return (TACTICAL.sweepDamageMultiplier + dexterityBonus) * (state.player.weapon.sweepDamageMultiplier || 1);
+      }
+      return TACTICAL.attackDamageMultiplier * (state.player.weapon.attackDamageMultiplier || 1);
+    }
+
+    function contextualWeaponDamageMultiplier(enemy) {
+      let multiplier = 1;
+      if (enemy?.tags?.includes("boss")) multiplier *= state.player.weapon.bossDamageMultiplier || 1;
+      if (enemy?.maxHp > 0 && enemy.hp / enemy.maxHp <= (state.player.weapon.executeHpThreshold || 0.35)) {
+        multiplier *= state.player.weapon.executeDamageMultiplier || 1;
+      }
+      if (state.round === 1) multiplier *= state.player.weapon.firstStrikeDamageMultiplier || 1;
+      return multiplier;
+    }
+
+    function actionGlancingDamageMultiplier(action) {
+      if (action === "heavy") return TACTICAL.heavyGlancingDamageMultiplier;
+      if (action === "quick") return TACTICAL.quickGlancingDamageMultiplier;
+      if (action === "sweep") return TACTICAL.sweepGlancingDamageMultiplier;
+      if (action === "attack") return TACTICAL.attackGlancingDamageMultiplier;
+      return 0;
+    }
+
+    function sunderEffectiveness(action) {
+      if (action === "sweep" || action === "guard" || action === "ability") return 0;
+      if (action === "quick") return TACTICAL.sunderQuickEffectiveness;
+      if (action === "heavy") return TACTICAL.sunderHeavyEffectiveness;
+      return 1;
+    }
+
+    function sunderDamageMultiplier(enemy, action) {
+      if (!enemy || !enemy.sunder || action === "sweep" || action === "guard" || action === "ability") return 1;
+      const perStack = TACTICAL.sunderDamageBonusPerStack + (state.player.weapon.sunderBonusPerStack || 0);
+      return 1 + enemy.sunder * perStack * sunderEffectiveness(action);
+    }
+
+    function sunderAddedByAction(action) {
+      if (action === "attack") return state.player.weapon.sunderOnHit || 0;
+      if (action === "heavy") return (state.player.weapon.sunderOnHit || 0) + (state.player.weapon.sunderOnHeavyHit || 0);
+      return 0;
+    }
+
+    function expectedPlayerDamage(enemy, action, strikeMultiplier = 1, canCrit = true) {
+      if (!enemy || enemy.hp <= 0 || action === "guard" || action === "ability") return 0;
+      const hit = playerHitChance(enemy, action);
+      const crit = canCrit && action !== "sweep" ? playerCritChance(enemy, action) : 0;
+      const quality = playerDamageQuality(enemy, action);
+      let damage = playerBaseDamage()
+        * actionDamageMultiplier(action)
+        * sunderDamageMultiplier(enemy, action)
+        * contextualWeaponDamageMultiplier(enemy)
+        * strikeMultiplier;
+      if (action !== "sweep") damage *= 1 + (state.player.weapon.onHitBonusDamage || 0);
+      if (enemy.intent === "guard") {
+        let reduction = TACTICAL.enemyGuardReduction;
+        if (action === "heavy") reduction *= 1 - TACTICAL.heavyGuardIgnore;
+        damage *= 1 - reduction;
+      }
+      const expectedDamage = damage * (1 + COMBAT.damageVariance * quality);
+      const critFactor = 1 + crit * ((COMBAT.critMultiplier + state.player.weapon.critMultiplierModifier) - 1);
+      return expectedDamage * (hit * critFactor + (1 - hit) * actionGlancingDamageMultiplier(action));
+    }
+
+    function expectedSweepDamage() {
+      return state.enemies.reduce((sum, enemy) => {
+        if (enemy.hp <= 0) return sum;
+        return sum + expectedPlayerDamage(enemy, "sweep");
+      }, 0);
+    }
+
+    function expectedIncomingDamage(defense = false) {
+      const guarding = defense === true || defense === "guard";
+      const usingAbility = defense === "ability";
+      return state.enemies.reduce((sum, enemy) => {
+        if (enemy.hp <= 0 || enemy.interrupted || enemy.intent === "aim" || enemy.intent === "guard") return sum;
+        let incoming = enemyIntentDamage(enemy);
+        if (usingAbility) {
+          incoming *= 1 - abilityGuardReduction(enemy);
+        } else if (guarding) {
+          const reduction = enemy.intent === "pierce" ? TACTICAL.pierceGuardReduction : TACTICAL.playerGuardReduction;
+          incoming *= 1 - reduction;
+        }
+        return sum + incoming;
+      }, 0);
+    }
+
+    function applyDamageToEnemy(enemy, damage) {
+      const blocked = Math.min(enemy.shield || 0, Math.max(0, damage));
+      enemy.shield = Math.max(0, (enemy.shield || 0) - blocked);
+      enemy.hp = Math.max(0, enemy.hp - Math.max(0, damage - blocked));
+      return blocked;
+    }
+
+    function expirePlayerTurnStatuses() {
+      state.enemies.forEach(enemy => {
+        if (enemy.shieldTurns > 0) {
+          enemy.shieldTurns -= 1;
+          if (enemy.shieldTurns <= 0) enemy.shield = 0;
+        }
+        if (enemy.invisibleTurns > 0) {
+          enemy.invisibleTurns -= 1;
+          enemy.invisible = enemy.invisibleTurns > 0;
+        }
+      });
+    }
+
+    function resolveStrike(enemy, action, multiplier = 1, canCrit = true, label = null) {
+      const hit = playerHitChance(enemy, action);
+      const hitRoll = Math.random();
+      const landed = hitRoll <= hit;
+      const rollText = `roll ${pctDetail(hitRoll)} / ${pctDetail(hit)}`;
+      const actionName = label || actionLogName(action);
+      const grazeMultiplier = landed ? 1 : actionGlancingDamageMultiplier(action);
+      let damage = variedDamage(
+        playerBaseDamage()
+          * actionDamageMultiplier(action)
+          * sunderDamageMultiplier(enemy, action)
+          * contextualWeaponDamageMultiplier(enemy)
+          * (action !== "sweep" ? 1 + (state.player.weapon.onHitBonusDamage || 0) : 1)
+          * multiplier
+          * grazeMultiplier,
+        playerDamageQuality(enemy, action)
+      );
+      if (enemy.intent === "guard") {
+        let reduction = TACTICAL.enemyGuardReduction;
+        if (action === "heavy") reduction *= 1 - TACTICAL.heavyGuardIgnore;
+        damage *= 1 - reduction;
+      }
+      const crit = landed && action !== "sweep" && canCrit && Math.random() <= playerCritChance(enemy, action);
+      if (crit) damage *= COMBAT.critMultiplier + state.player.weapon.critMultiplierModifier;
+      const blocked = applyDamageToEnemy(enemy, damage);
+      const sunderAdded = landed ? sunderAddedByAction(action) : 0;
+      if (sunderAdded > 0 && enemy.hp > 0) {
+        enemy.sunder = Math.min(TACTICAL.sunderMaxStacks, (enemy.sunder || 0) + sunderAdded);
+      }
+      const stunned = action === "heavy"
+        && landed
+        && enemy.hp > 0
+        && (state.player.weapon.stunOnHeavyHitChance || 0) > 0
+        && Math.random() <= state.player.weapon.stunOnHeavyHitChance;
+      const staggered = landed
+        && enemy.hp > 0
+        && (state.player.weapon.staggerOnHitChance || 0) > 0
+        && Math.random() <= state.player.weapon.staggerOnHitChance;
+      const frozen = landed
+        && enemy.hp > 0
+        && (state.player.weapon.freezeOnHitChance || 0) > 0
+        && Math.random() <= state.player.weapon.freezeOnHitChance;
+      if (stunned || staggered || frozen) enemy.interrupted = true;
+      const verb = action === "sweep" ? (landed ? "struck" : "grazed") : (landed ? "hit" : "grazed");
+      const sunderText = sunderAdded > 0 && enemy.hp > 0 ? ` · Sunder ${enemy.sunder}` : "";
+      const stunText = stunned ? " · stunned" : staggered ? " · staggered" : frozen ? " · frozen" : "";
+      const shieldText = blocked > 0 ? ` · ${humanDamage(blocked)} blocked` : "";
+      log(`${actionName} ${verb} ${enemy.name} for ${humanDamage(damage)} (${rollText})${crit ? " crit" : ""}${shieldText}${sunderText}${stunText}.`);
+      state.debug.damageDealt += damage;
+      return damage;
+    }
+
+    function resolveSweep() {
+      let total = 0;
+      state.enemies.forEach(enemy => {
+        if (enemy.hp <= 0) return;
+        total += resolveStrike(enemy, "sweep");
+      });
+      if (total > 0) log(`Sweep total: ${humanDamage(total)}.`, "good");
+    }
+
+    function resolveRiposte(enemy, ability) {
+      const damage = resolveStrike(enemy, "attack", ability.counterDamageMultiplier || 0.82, true, "Riposte");
+      if (damage > 0) {
+        enemy.riposted = true;
+      }
+      return damage;
+    }
+
+    function useAction(action) {
+      if (state.phase !== "combat" || state.player.hp <= 0) return;
+      const alive = state.enemies.filter(enemy => enemy.hp > 0);
+      if (!alive.length) return;
+      state.enemies.forEach(enemy => {
+        enemy.riposted = false;
+      });
+      if (action === "ability" && !abilityHasCharges()) {
+        log("No class ability charges left.", "warn");
+        render();
+        return;
+      }
+      if (!canAffordAction(action)) {
+        log(`${actionLogName(action)} needs ${actionManaCost(action)} MP.`, "warn");
+        render();
+        return;
+      }
+      if (state.debug.actions[action] !== undefined) {
+        state.debug.actions[action] += 1;
+      }
+      state.player.mana = Math.max(0, state.player.mana - actionManaCost(action));
+
+      if (action === "sweep") {
+        resolveSweep();
+      } else if (action === "ability") {
+        const ability = activeAbility();
+        state.player.abilityCharges = Math.max(0, (state.player.abilityCharges || 0) - 1);
+        log(`${ability.name}: ${abilityComment(ability)}.`, "good");
+      } else if (action !== "guard") {
+        let target = state.enemies[state.selected];
+        if (!target || target.hp <= 0) {
+          const nextIndex = state.enemies.findIndex(enemy => enemy.hp > 0);
+          state.selected = Math.max(0, nextIndex);
+          target = state.enemies[state.selected];
+        }
+        resolveStrike(target, action);
+        if (target.hp > 0 && action === "quick" && Math.random() <= doubleStrikeChance()) {
+          resolveStrike(target, action, TACTICAL.doubleStrikeDamageMultiplier, false);
+        }
+        if (target.hp > 0 && action === "quick" && target.intent === "heavy" && Math.random() <= interruptChance()) {
+          target.interrupted = true;
+          log(`${target.name} was interrupted.`, "good");
+        }
+      } else {
+        log("Guard raised.", "good");
+      }
+
+      if (state.enemies.every(enemy => enemy.hp <= 0)) {
+        clearRoom();
+        return;
+      }
+
+      resolveEnemies(action);
+      if (state.player.hp <= 0) {
+        state.phase = "dead";
+        log("Run ended.", "bad");
+        render();
+        return;
+      }
+      restoreMana();
+      state.round += 1;
+      state.enemies.forEach((enemy, index) => {
+        if (enemy.hp <= 0) return;
+        if (enemy.interrupted) {
+          enemy.interrupted = false;
+          enemy.aimed = false;
+          enemy.intent = chooseIntent(enemy, state.round, state.enemies, index);
+          return;
+        }
+        if (enemy.intent === "aim") {
+          enemy.aimed = true;
+        } else {
+          enemy.aimed = false;
+        }
+        enemy.intent = chooseIntent(enemy, state.round, state.enemies, index);
+      });
+      render();
+    }
+
+    function resolveEnemies(action) {
+      expirePlayerTurnStatuses();
+      const ability = activeAbility();
+      let riposteTriggers = action === "ability" ? (ability?.counterTriggers || 0) : 0;
+      state.enemies.forEach((enemy, index) => {
+        if (enemy.hp <= 0 || enemy.interrupted) return;
+        if (enemy.intent === "aim" || enemy.intent === "guard") {
+          log(`${enemy.name} used ${enemy.intent}.`);
+          return;
+        }
+        if (enemy.intent === "heal") {
+          const targetIndex = supportHealTarget(state.enemies, index);
+          if (targetIndex !== null) {
+            const target = state.enemies[targetIndex];
+            const amount = enemy.damage * TACTICAL.supportHealDamageMultiplier;
+            const before = target.hp;
+            target.hp = Math.min(target.maxHp, target.hp + amount);
+            log(`${enemy.name} healed ${target.name} for ${humanHp(target.hp - before)}.`, "good");
+          }
+          return;
+        }
+        if (enemy.intent === "shield") {
+          const targetIndex = supportShieldTarget(state.enemies, index);
+          if (targetIndex !== null) {
+            const target = state.enemies[targetIndex];
+            const maxShield = target.maxHp * TACTICAL.supportShieldMaxHpFraction;
+            const amount = enemy.damage * TACTICAL.supportShieldDamageMultiplier;
+            const before = target.shield || 0;
+            target.shield = Math.min(maxShield, before + amount);
+            target.shieldTurns = 1;
+            log(`${enemy.name} shielded ${target.name} for ${humanHp(target.shield - before)}.`, "good");
+          }
+          return;
+        }
+        if (enemy.intent === "invisibility") {
+          const targetIndex = supportInvisibilityTarget(state.enemies, index);
+          if (targetIndex !== null) {
+            const target = state.enemies[targetIndex];
+            target.invisible = true;
+            target.invisibleTurns = 1;
+            log(`${enemy.name} hid ${target.name}.`, "warn");
+          }
+          return;
+        }
+        let damage = variedDamage(enemyIntentDamage(enemy));
+        if (action === "ability") {
+          damage *= 1 - abilityGuardReduction(enemy);
+        } else if (action === "guard") {
+          const reduction = enemy.intent === "pierce" ? TACTICAL.pierceGuardReduction : TACTICAL.playerGuardReduction;
+          damage *= 1 - reduction;
+        }
+        state.player.hp = Math.max(0, state.player.hp - damage);
+        state.debug.damageTaken += damage;
+        log(`${enemy.name} dealt ${humanDamage(damage)}.`);
+        if (action === "ability" && ability && riposteTriggers > 0 && state.player.hp > 0 && enemy.hp > 0) {
+          riposteTriggers -= 1;
+          resolveRiposte(enemy, ability);
+        }
+      });
+    }
+
+    function clearRoom() {
+      const room = dungeon[state.roomIndex];
+      log(`Cleared R${state.roomIndex + 1}.`, "good");
+      state.debug.roomsCleared += 1;
+      applyTrainingGain(room);
+      applyPassiveRoomHealing(room);
+      if (room.isBoss && room.level >= 5) {
+        state.roomIndex += 1;
+        state.phase = "won";
+        log("Dungeon cleared.", "good");
+        render();
+        return;
+      }
+      state.phase = "loot";
+      state.draft = generateLootDraft(room);
+      render();
+    }
+
+    function spendLuck(room) {
+      const share = room.isBoss ? LOOT.bossLuckShare : LOOT.normalLuckShare;
+      const target = LOOT.baseLuckPool * Math.pow(LOOT.luckPoolGrowth, room.level - 1) * share;
+      const varied = target * (1 - LOOT.luckVariance + Math.random() * LOOT.luckVariance * 2);
+      const spend = Math.min(state.levelPool.remaining, Math.max(LOOT.commonCost, varied));
+      state.levelPool.remaining = Math.max(0, state.levelPool.remaining - spend);
+      return spend;
+    }
+
+    function rarity(power, isUnique = false) {
+      if (isUnique) return "unique";
+      if (power >= LOOT.legendaryCost) return "legendary";
+      if (power >= LOOT.epicCost) return "epic";
+      if (power >= LOOT.veryRareCost) return "very rare";
+      if (power >= LOOT.rareCost) return "rare";
+      if (power >= LOOT.uncommonCost) return "uncommon";
+      return "common";
+    }
+
+    function tier(power) {
+      if (power >= LOOT.legendaryCost) return 6;
+      if (power >= LOOT.epicCost) return 5;
+      if (power >= LOOT.veryRareCost) return 4;
+      if (power >= LOOT.rareCost) return 3;
+      if (power >= LOOT.uncommonCost) return 2;
+      return 1;
+    }
+
+    function rarityClass(item) {
+      return (item.rarity || rarity(item.power, item.isUnique)).replace(/\s+/g, "-");
+    }
+
+    function weightedChoice(weightedValues) {
+      const total = weightedValues.reduce((sum, item) => sum + Math.max(0, item.weight), 0);
+      let roll = Math.random() * total;
+      for (const item of weightedValues) {
+        roll -= Math.max(0, item.weight);
+        if (roll <= 0) return item.value;
+      }
+      return weightedValues[weightedValues.length - 1].value;
+    }
+
+    function draftFocus(room) {
+      const chance = LOOT.focusDraftChance + (room.level <= 2 ? LOOT.earlyFocusDraftBonus : 0);
+      if (Math.random() > chance) return null;
+      return Math.random() < 0.5 ? "strength" : "dexterity";
+    }
+
+    function generateLootDraft(room) {
+      const spend = spendLuck(room);
+      const focus = draftFocus(room);
+      const draft = [];
+      const usedKeys = new Set();
+      while (draft.length < 3) {
+        const availableKinds = availableLootKinds(usedKeys);
+        if (!availableKinds.length) break;
+        const rolled = rollOptionPower(spend);
+        const power = rolled.power;
+        const isUnique = rolled.isUnique;
+        const kind = weightedChoice(availableKinds);
+        let item = null;
+        if (kind === "weapon") {
+          item = makeWeaponItem(power, focus, isUnique, usedKeys);
+        } else if (kind === "consumable") {
+          item = makePotionItem(power, isUnique);
+        } else {
+          const stat = chooseStatTarget(focus, usedKeys);
+          item = stat ? makeStatItem(stat, power, isUnique) : null;
+        }
+        if (!item) continue;
+        draft.push(item);
+        usedKeys.add(choiceIdentity(item));
+      }
+      return draft;
+    }
+
+    function choiceIdentity(item) {
+      if (item.kind === "stat") return `stat:${item.stat}`;
+      if (item.kind === "consumable") return `instant:${item.effect}`;
+      if (item.kind === "weapon") return `weapon:${item.style}`;
+      return `${item.kind}:${item.name}`;
+    }
+
+    function availableStatTargets(usedKeys) {
+      return ["hp", "strength", "dexterity"].filter(stat => !usedKeys.has(`stat:${stat}`));
+    }
+
+    function availableWeaponStyles(usedKeys) {
+      const styles = [...new Set(MAPPED_WEAPON_TEMPLATES.map(template => template.style))];
+      return styles.filter(style => !usedKeys.has(`weapon:${style}`));
+    }
+
+    function availableLootKinds(usedKeys) {
+      return [
+        { value: "stat", weight: availableStatTargets(usedKeys).length ? LOOT.statItemWeight : 0 },
+        { value: "weapon", weight: availableWeaponStyles(usedKeys).length ? LOOT.weaponItemWeight : 0 },
+        { value: "consumable", weight: usedKeys.has("instant:restore_hp") ? 0 : LOOT.consumableItemWeight }
+      ].filter(item => item.weight > 0);
+    }
+
+    function chooseStatTarget(focus, usedKeys) {
+      const available = availableStatTargets(usedKeys);
+      if (!available.length) return null;
+      if (focus && available.includes(focus) && Math.random() <= LOOT.focusedStatChoiceChance) return focus;
+      return weightedChoice([
+        { value: "hp", weight: available.includes("hp") ? 1 : 0 },
+        { value: "strength", weight: available.includes("strength") ? 1 : 0 },
+        { value: "dexterity", weight: available.includes("dexterity") ? 1 : 0 }
+      ].filter(item => item.weight > 0));
+    }
+
+    function rollOptionPower(spend) {
+      let power = spend * (0.72 + Math.random() * 0.48);
+      const roll = Math.random();
+      if (roll < LOOT.uniqueOptionChance) {
+        power *= LOOT.uniquePowerMultiplier;
+        return { power: Math.max(0.75, power), isUnique: true };
+      }
+      if (roll < LOOT.uniqueOptionChance + LOOT.jackpotOptionChance) {
+        power *= LOOT.jackpotPowerMultiplier;
+      } else if (roll < LOOT.uniqueOptionChance + LOOT.jackpotOptionChance + LOOT.luckyOptionChance) {
+        power *= LOOT.luckyPowerMultiplier;
+      }
+      return { power: Math.max(0.75, power), isUnique: false };
+    }
+
+    function statLootNote(stat) {
+      if (stat === "hp") return "max HP buffer";
+      if (stat === "strength") return "base damage and Heavy payoff";
+      if (stat === "dexterity") return "crit, dodge, Quick pressure";
+      return "stat upgrade";
+    }
+
+    function weaponLootNotes(item) {
+      const notes = [];
+      const weapon = item.weapon || {};
+      if (
+        item.style === "axe"
+        || (weapon.heavyDamageMultiplier || 1) > 1.04
+        || (weapon.sunderOnHeavyHit || 0) > 0
+        || (weapon.stunOnHeavyHitChance || 0) > 0
+      ) {
+        notes.push("Heavy payoff");
+      }
+      if (
+        item.style === "rapier"
+        || (weapon.quickDamageMultiplier || 1) > 1.04
+        || (weapon.doubleStrikeChanceModifier || 0) > 0
+      ) {
+        notes.push("Quick pressure");
+      }
+      if (
+        (weapon.hitModifier || 0) > 0.01
+        || (weapon.critModifier || 0) > 0.01
+        || (weapon.critMultiplierModifier || 0) > 0.01
+      ) {
+        notes.push("precision/crit");
+      }
+      if (
+        (weapon.staggerOnHitChance || 0) > 0
+        || (weapon.freezeOnHitChance || 0) > 0
+        || (weapon.onHitBonusDamage || 0) > 0
+      ) {
+        notes.push("on-hit control");
+      }
+      if (
+        (weapon.bossDamageMultiplier || 1) > 1.02
+        || (weapon.executeDamageMultiplier || 1) > 1.02
+        || (weapon.firstStrikeDamageMultiplier || 1) > 1.02
+      ) {
+        notes.push("situational burst");
+      }
+      if (!notes.length) notes.push("steady upgrade");
+      return notes.slice(0, 2).join(" · ");
+    }
+
+    function healthBottle(power, isUnique = false) {
+      if (isUnique) {
+        return { name: "Crimson Elixir", tier: 6, value: Math.round(LOOT.legendaryCost * LOOT.potionHpPerPower), sprite: SPRITES.crimsonElixir };
+      }
+      if (power >= LOOT.epicCost) {
+        return { name: "Crimson Elixir", tier: 5, value: Math.round(LOOT.epicCost * LOOT.potionHpPerPower), sprite: SPRITES.crimsonElixir };
+      }
+      if (power >= LOOT.uncommonCost) {
+        return { name: "Crimson Potion", tier: 3, value: Math.round(LOOT.rareCost * LOOT.potionHpPerPower), sprite: SPRITES.crimsonPotion };
+      }
+      return { name: "Crimson Vial", tier: 1, value: Math.round(LOOT.commonCost * LOOT.potionHpPerPower), sprite: SPRITES.crimsonVial };
+    }
+
+    function makeStatItem(stat, power, isUnique = false) {
+      const names = {
+        hp: ["Vital Amulet", STATS.hpPerPower, SPRITES.hp, "amulet"],
+        strength: ["Force Ring", STATS.strengthPerPower, SPRITES.strength, "charm"],
+        dexterity: ["Grace Relic", STATS.dexterityPerPower, SPRITES.dexterity, "relic"]
+      };
+      const uniqueNames = {
+        hp: "Heartseed Amulet",
+        strength: "Titan's Knot",
+        dexterity: "Silkstep Charm"
+      };
+      const [baseName, conversion, sprite, slot] = names[stat];
+      const value = conversion * power * (0.86 + Math.random() * 0.28);
+      const itemRarity = rarity(power, isUnique);
+      return {
+        kind: "stat",
+        slot,
+        stat,
+        value,
+        power,
+        isUnique,
+        rarity: itemRarity,
+        sprite,
+        name: isUnique ? uniqueNames[stat] : `${baseName} +${tier(power)}`,
+        desc: `${SLOT_LABELS[slot]} · ${humanGain(value)} ${stat.toUpperCase()} · ${itemRarity} · ${statLootNote(stat)}`
+      };
+    }
+
+    function chooseWeaponStyle(focus, usedKeys = new Set()) {
+      const available = new Set(availableWeaponStyles(usedKeys));
+      const filter = options => options.filter(option => available.has(option.value));
+      if (focus === "strength") {
+        return weightedChoice(filter([
+          { value: "sword", weight: 0.32 },
+          { value: "axe", weight: 0.56 },
+          { value: "rapier", weight: 0.12 }
+        ]));
+      }
+      if (focus === "dexterity") {
+        return weightedChoice(filter([
+          { value: "sword", weight: 0.18 },
+          { value: "axe", weight: 0.10 },
+          { value: "rapier", weight: 0.72 }
+        ]));
+      }
+      return weightedChoice(filter([
+        { value: "sword", weight: 0.45 },
+        { value: "axe", weight: 0.25 },
+        { value: "rapier", weight: 0.30 }
+      ]));
+    }
+
+    function makeLegacyWeaponItem(power, focus = null, isUnique = false, usedKeys = new Set()) {
+      const style = chooseWeaponStyle(focus, usedKeys);
+      const itemRarity = rarity(power, isUnique);
+      const item = {
+        kind: "weapon",
+        slot: "weapon",
+        power,
+        isUnique,
+        rarity: itemRarity,
+        style,
+        sprite: SPRITES[style],
+        weapon: {
+          name: style === "axe" ? "Heavy Axe" : style === "rapier" ? "Needle Rapier" : "Balanced Sword",
+          damageMultiplier: 1,
+          attackDamageMultiplier: 1,
+          heavyDamageMultiplier: 1,
+          quickDamageMultiplier: 1,
+          sweepDamageMultiplier: 1,
+          hitModifier: 0,
+          critModifier: 0,
+          critMultiplierModifier: 0,
+          dexterityMultiplier: 1,
+          sunderOnHit: 0,
+          sunderOnHeavyHit: 0,
+          sunderBonusPerStack: 0,
+          stunOnHeavyHitChance: 0
+        }
+      };
+      let effect = null;
+      let effectCost = 0;
+      if (style === "axe") {
+        let effectChance = 0;
+        if (isUnique) effectChance = 1;
+        else if (power >= LOOT.epicCost) effectChance = LOOT.weaponEffectEpicChance;
+        else if (power >= LOOT.rareCost) effectChance = LOOT.weaponEffectRareChance;
+        else if (power >= LOOT.uncommonCost) effectChance = LOOT.weaponEffectUncommonChance;
+        if (Math.random() < effectChance) {
+          effect = weightedChoice([
+            { value: "crushing", weight: 0.62 },
+            { value: "stunning", weight: 0.38 }
+          ]);
+          const baseCost = effect === "crushing" ? LOOT.axeCrushEffectCost : LOOT.axeStunEffectCost;
+          effectCost = Math.min(Math.max(0, power - 0.75), baseCost);
+          if (effectCost <= 0) effect = null;
+        }
+      }
+      const rawPower = Math.max(0.75, power - effectCost);
+      if (style === "sword") {
+        item.weapon.damageMultiplier += 0.018 * rawPower;
+        item.weapon.attackDamageMultiplier += 0.004 * rawPower;
+        item.weapon.heavyDamageMultiplier += 0.004 * rawPower;
+        item.weapon.quickDamageMultiplier += 0.003 * rawPower;
+        item.weapon.critModifier += 0.003 * rawPower;
+      } else if (style === "axe") {
+        item.weapon.damageMultiplier += 0.018 * rawPower;
+        item.weapon.heavyDamageMultiplier += 0.040 * rawPower;
+        item.weapon.quickDamageMultiplier = Math.max(0.70, item.weapon.quickDamageMultiplier - 0.012 * rawPower);
+        item.weapon.sweepDamageMultiplier = Math.max(0.70, item.weapon.sweepDamageMultiplier - 0.008 * rawPower);
+        item.weapon.hitModifier -= 0.006 * rawPower;
+        item.weapon.dexterityMultiplier = Math.max(0.70, item.weapon.dexterityMultiplier - Math.min(0.18, 0.012 * rawPower));
+        if (effect === "crushing") {
+          item.weapon.name = "Crushing Heavy Axe";
+          item.weapon.sunderOnHit = 1;
+          item.weapon.sunderOnHeavyHit = 1;
+          item.weapon.sunderBonusPerStack += 0.004 * effectCost;
+        } else if (effect === "stunning") {
+          item.weapon.name = "Stunning Heavy Axe";
+          item.weapon.stunOnHeavyHitChance = Math.min(0.28, 0.10 + 0.04 * effectCost);
+        }
+      } else {
+        item.weapon.damageMultiplier += 0.007 * rawPower;
+        item.weapon.heavyDamageMultiplier = Math.max(0.70, item.weapon.heavyDamageMultiplier - 0.010 * rawPower);
+        item.weapon.quickDamageMultiplier += 0.020 * rawPower;
+        item.weapon.sweepDamageMultiplier += 0.016 * rawPower;
+        item.weapon.hitModifier += 0.004 * rawPower;
+        item.weapon.critModifier += 0.007 * rawPower;
+        item.weapon.critMultiplierModifier += 0.010 * rawPower;
+        item.weapon.dexterityMultiplier += Math.min(0.10, 0.006 * rawPower);
+      }
+      const uniqueNames = {
+        sword: "First Oath",
+        axe: "Headsman's Promise",
+        rapier: "Threadneedle"
+      };
+      item.name = isUnique ? uniqueNames[style] : `${item.weapon.name} +${tier(power)}`;
+      const effectDesc = item.weapon.sunderOnHit
+        ? " · Crush: Sunder on Attack/Heavy"
+        : item.weapon.stunOnHeavyHitChance
+          ? ` · ${pct(item.weapon.stunOnHeavyHitChance)} heavy stun`
+          : "";
+      item.desc = `${humanGain((item.weapon.damageMultiplier - 1) * 100)}% damage · ${itemRarity}${effectDesc} · ${weaponLootNotes(item)}`;
+      return item;
+    }
+
+    function mappedWeaponTemplatesForStyle(style) {
+      return MAPPED_WEAPON_TEMPLATES.filter(template => template.style === style);
+    }
+
+    function makeMappedWeaponShell(template, power, itemRarity, style, isUnique) {
+      return {
+        kind: "weapon",
+        slot: "weapon",
+        power,
+        isUnique,
+        rarity: itemRarity,
+        style,
+        assetId: template.assetId,
+        assetFamily: template.family,
+        sprite: template.sprite,
+        mappedEffects: [],
+        weapon: {
+          name: template.name,
+          damageMultiplier: 1,
+          attackDamageMultiplier: 1,
+          heavyDamageMultiplier: 1,
+          quickDamageMultiplier: 1,
+          sweepDamageMultiplier: 1,
+          hitModifier: 0,
+          critModifier: 0,
+          critMultiplierModifier: 0,
+          dexterityMultiplier: 1,
+          sunderOnHit: 0,
+          sunderOnHeavyHit: 0,
+          sunderBonusPerStack: 0,
+          stunOnHeavyHitChance: 0,
+          damageQualityModifier: 0,
+          doubleStrikeChanceModifier: 0,
+          staggerOnHitChance: 0,
+          freezeOnHitChance: 0,
+          onHitBonusDamage: 0,
+          bossDamageMultiplier: 1,
+          executeDamageMultiplier: 1,
+          executeHpThreshold: 0.35,
+          firstStrikeDamageMultiplier: 1
+        },
+        statBonus: { hp: 0, strength: 0, dexterity: 0 }
+      };
+    }
+
+    function applyMappedWeaponEffect(item, effect, spent) {
+      let value = 0;
+      if (effect === "weapon_damage") {
+        value = 0.020 * spent;
+        item.weapon.damageMultiplier += value;
+      } else if (effect === "strength") {
+        value = 0.20 * spent;
+        item.statBonus.strength += value;
+        item.weapon.damageMultiplier += 0.006 * spent;
+        item.weapon.heavyDamageMultiplier += 0.006 * spent;
+      } else if (effect === "dexterity") {
+        value = 0.20 * spent;
+        item.statBonus.dexterity += value;
+        item.weapon.hitModifier += 0.0025 * spent;
+        item.weapon.quickDamageMultiplier += 0.006 * spent;
+      } else if (effect === "max_hp") {
+        value = 0.48 * spent;
+        item.statBonus.hp += value;
+      } else if (effect === "hit_chance") {
+        value = 0.008 * spent;
+        item.weapon.hitModifier += value;
+      } else if (effect === "crit_chance") {
+        value = 0.008 * spent;
+        item.weapon.critModifier += value;
+      } else if (effect === "crit_damage") {
+        value = 0.012 * spent;
+        item.weapon.critMultiplierModifier += value;
+      } else if (effect === "damage_roll_quality") {
+        value = 0.012 * spent;
+        item.weapon.damageQualityModifier += value;
+      } else if (effect === "double_strike") {
+        value = 0.018 * spent;
+        item.weapon.doubleStrikeChanceModifier += value;
+      } else if (effect === "stagger") {
+        value = 0.018 * spent;
+        item.weapon.staggerOnHitChance += value;
+      } else if (effect === "on_hit_burn") {
+        value = 0.014 * spent;
+        item.weapon.onHitBonusDamage += value;
+      } else if (effect === "on_hit_poison") {
+        value = 0.012 * spent;
+        item.weapon.onHitBonusDamage += value;
+      } else if (effect === "on_hit_shock") {
+        value = 0.018 * spent;
+        item.weapon.onHitBonusDamage += value;
+      } else if (effect === "on_hit_freeze") {
+        value = 0.016 * spent;
+        item.weapon.freezeOnHitChance += value;
+      } else if (effect === "boss_damage") {
+        value = 0.020 * spent;
+        item.weapon.bossDamageMultiplier += value;
+      } else if (effect === "execute_damage") {
+        value = 0.025 * spent;
+        item.weapon.executeDamageMultiplier += value;
+      } else if (effect === "first_strike") {
+        value = 0.030 * spent;
+        item.weapon.firstStrikeDamageMultiplier += value;
+      }
+      if (value > 0) {
+        item.mappedEffects.push({ effect, spent, value });
+      }
+    }
+
+    function mappedWeaponTemplateWeight(template, focus) {
+      const effects = new Set(template.effects.map(entry => entry.effect));
+      let weight = 1;
+      if (focus === "strength" && ["strength", "weapon_damage", "stagger"].some(effect => effects.has(effect))) {
+        weight += 0.45;
+      }
+      if (focus === "dexterity" && ["dexterity", "hit_chance", "crit_chance", "double_strike"].some(effect => effects.has(effect))) {
+        weight += 0.45;
+      }
+      return weight;
+    }
+
+    function makeWeaponItem(power, focus = null, isUnique = false, usedKeys = new Set()) {
+      const style = chooseWeaponStyle(focus, usedKeys);
+      const templates = mappedWeaponTemplatesForStyle(style);
+      const template = weightedChoice((templates.length ? templates : MAPPED_WEAPON_TEMPLATES)
+        .map(entry => ({ value: entry, weight: mappedWeaponTemplateWeight(entry, focus) })));
+      const itemRarity = rarity(power, isUnique);
+      const rawPower = Math.max(0.75, power);
+      const item = makeMappedWeaponShell(template, power, itemRarity, style, isUnique);
+
+      if (style === "sword") {
+        item.weapon.damageMultiplier += 0.010 * rawPower;
+        item.weapon.attackDamageMultiplier += 0.004 * rawPower;
+        item.weapon.heavyDamageMultiplier += 0.004 * rawPower;
+        item.weapon.quickDamageMultiplier += 0.003 * rawPower;
+        item.weapon.critModifier += 0.003 * rawPower;
+      } else if (style === "axe") {
+        item.weapon.damageMultiplier += 0.010 * rawPower;
+        item.weapon.heavyDamageMultiplier += 0.026 * rawPower;
+        item.weapon.quickDamageMultiplier -= 0.010 * rawPower;
+        item.weapon.sweepDamageMultiplier -= 0.006 * rawPower;
+        item.weapon.hitModifier -= 0.004 * rawPower;
+        item.weapon.dexterityMultiplier -= Math.min(0.16, 0.010 * rawPower);
+      } else {
+        item.weapon.damageMultiplier += 0.006 * rawPower;
+        item.weapon.heavyDamageMultiplier -= 0.008 * rawPower;
+        item.weapon.quickDamageMultiplier += 0.016 * rawPower;
+        item.weapon.sweepDamageMultiplier += 0.012 * rawPower;
+        item.weapon.hitModifier += 0.004 * rawPower;
+        item.weapon.critModifier += 0.007 * rawPower;
+        item.weapon.critMultiplierModifier += 0.008 * rawPower;
+        item.weapon.dexterityMultiplier += Math.min(0.10, 0.006 * rawPower);
+      }
+
+      template.effects.forEach(entry => applyMappedWeaponEffect(item, entry.effect, rawPower * entry.weight));
+      item.weapon.heavyDamageMultiplier = Math.max(0.70, item.weapon.heavyDamageMultiplier);
+      item.weapon.quickDamageMultiplier = Math.max(0.70, item.weapon.quickDamageMultiplier);
+      item.weapon.sweepDamageMultiplier = Math.max(0.70, item.weapon.sweepDamageMultiplier);
+      item.weapon.dexterityMultiplier = Math.max(0.70, item.weapon.dexterityMultiplier);
+      item.weapon.staggerOnHitChance = Math.min(0.32, item.weapon.staggerOnHitChance);
+      item.weapon.freezeOnHitChance = Math.min(0.32, item.weapon.freezeOnHitChance);
+      item.name = isUnique ? template.name : `${template.name} +${tier(power)}`;
+      const effectDesc = item.mappedEffects
+        .slice(0, 2)
+        .map(entry => entry.effect.replaceAll("_", " "))
+        .join(", ");
+      item.desc = `${humanGain((item.weapon.damageMultiplier - 1) * 100)}% damage · ${itemRarity}${effectDesc ? ` · ${effectDesc}` : ""} · ${weaponLootNotes(item)}`;
+      return item;
+    }
+
+    function makePotionItem(power, isUnique = false) {
+      const itemRarity = rarity(power, isUnique);
+      const bottle = healthBottle(power, isUnique);
+      return {
+        kind: "consumable",
+        effect: "restore_hp",
+        value: bottle.value,
+        power,
+        isUnique,
+        rarity: itemRarity,
+        sprite: bottle.sprite,
+        name: bottle.name,
+        tier: bottle.tier,
+        desc: `Restore ${humanHp(bottle.value)} HP now · ${itemRarity} · fixed bottle, no max HP`
+      };
+    }
+
+    function chooseLoot(index) {
+      if (state.phase !== "loot") return;
+      const item = state.draft[index];
+      if (!item) return;
+      const chosenScore = lootChoiceScore(item);
+      if (item.kind === "consumable") {
+        const before = state.player.hp;
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + item.value);
+        state.player.consumed += 1;
+        state.debug.lootConsumed += 1;
+        state.debug.lootHistory.push({
+          room: state.roomIndex + 1,
+          action: "consume",
+          name: item.name,
+          score: chosenScore
+        });
+        log(`Drank ${item.name}. Restored ${humanHp(state.player.hp - before)} HP.`, "good");
+      } else {
+        equipWearableItem(item);
+        state.debug.lootEquipped += 1;
+        state.debug.lootHistory.push({
+          room: state.roomIndex + 1,
+          action: "equip",
+          slot: slotForItem(item),
+          name: item.name,
+          score: chosenScore
+        });
+        log(`Equipped ${item.name}.`, "good");
+      }
+      state.roomIndex += 1;
+      state.draft = [];
+      startRoom();
+    }
+
+    function skipLoot() {
+      if (state.phase !== "loot") return;
+      state.debug.lootSkipped += 1;
+      state.debug.lootHistory.push({
+        room: state.roomIndex + 1,
+        action: "skip",
+        bestOfferScore: state.draft.length ? Math.max(...state.draft.map(lootChoiceScore)) : 0
+      });
+      log("Kept current gear.");
+      state.roomIndex += 1;
+      state.draft = [];
+      startRoom();
+    }
+
+    function runExportPayload() {
+      const character = activeCharacter();
+      return {
+        exportedAt: new Date().toISOString(),
+        character: {
+          id: selectedCharacterId,
+          name: character.name,
+          weapon: state.player.weapon.name,
+          weights: character.weights
+        },
+        progress: {
+          roomIndex: state.roomIndex + 1,
+          phase: state.phase,
+          round: state.round,
+          roomsCleared: state.debug.roomsCleared,
+          trainingBudget: Number((state.trainingBudget || 0).toFixed(3))
+        },
+        player: {
+          hp: Number(state.player.hp.toFixed(3)),
+          maxHp: Number(state.player.maxHp.toFixed(3)),
+          mana: Number((state.player.mana || 0).toFixed(3)),
+          maxMana: Number((state.player.maxMana || 0).toFixed(3)),
+          strength: Number(state.player.strength.toFixed(3)),
+          dexterity: Number(state.player.dexterity.toFixed(3)),
+          weapon: state.player.weapon,
+          gear: state.player.items.map(item => ({
+            name: item.name,
+            kind: item.kind,
+            slot: slotForItem(item),
+            stat: item.stat || null,
+            value: item.value || null,
+            rarity: item.rarity || null
+          })),
+          stash: state.player.stash.map(item => item.name)
+        },
+        debug: {
+          actions: state.debug.actions,
+          damageDealt: Number(state.debug.damageDealt.toFixed(3)),
+          damageTaken: Number(state.debug.damageTaken.toFixed(3)),
+          lootEquipped: state.debug.lootEquipped,
+          lootConsumed: state.debug.lootConsumed,
+          lootSkipped: state.debug.lootSkipped,
+          lootHistory: state.debug.lootHistory.slice(-20)
+        },
+        enemies: state.enemies.map(enemy => ({
+          name: enemy.name,
+          hp: Number(enemy.hp.toFixed(3)),
+          maxHp: enemy.maxHp,
+          intent: enemy.intent,
+          tags: enemy.tags
+        })),
+        recentLog: state.log.slice(-20).map(entry => entry.text)
+      };
+    }
+
+    function runExportMarkdown(payload) {
+      const actions = Object.entries(payload.debug.actions)
+        .map(([action, count]) => `${action}:${count}`)
+        .join(" ");
+      const loot = payload.debug.lootHistory.length
+        ? payload.debug.lootHistory.map(item => `- R${item.room} ${item.action}: ${item.name || "kept gear"} (${fmt(item.score ?? item.bestOfferScore ?? 0, 2)})`).join("\n")
+        : "- none";
+      const logLines = payload.recentLog.map(entry => `- ${entry}`).join("\n");
+      return `# Dungeon Run Export
+
+${payload.exportedAt}
+
+Character: ${payload.character.name}
+Weapon: ${payload.character.weapon}
+Room: ${payload.progress.roomIndex}
+Phase: ${payload.progress.phase}
+Round: ${payload.progress.round}
+
+HP: ${humanHp(payload.player.hp)} / ${humanHp(payload.player.maxHp)}
+Mana: ${humanMana(payload.player.mana)} / ${humanMana(payload.player.maxMana)}
+STR: ${humanStat(payload.player.strength)}
+DEX: ${humanStat(payload.player.dexterity)}
+Training: ${fmt(payload.progress.trainingBudget, 2)}
+
+Actions: ${actions}
+Damage dealt: ${humanDamage(payload.debug.damageDealt)}
+Damage taken: ${humanDamage(payload.debug.damageTaken)}
+Loot equipped: ${payload.debug.lootEquipped}
+Loot consumed: ${payload.debug.lootConsumed}
+Loot skipped: ${payload.debug.lootSkipped}
+
+## Loot
+${loot}
+
+## State JSON
+\`\`\`json
+${JSON.stringify(payload, null, 2)}
+\`\`\`
+
+## Recent Log
+${logLines || "- none"}
+`;
+    }
+
+    function downloadText(filename, text) {
+      const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    async function exportRun() {
+      const payload = runExportPayload();
+      const markdown = runExportMarkdown(payload);
+      try {
+        await navigator.clipboard.writeText(markdown);
+        log("Run export copied to clipboard.", "good");
+      } catch (error) {
+        downloadText(`dungeon-run-${payload.exportedAt.replace(/[:.]/g, "-")}.md`, markdown);
+        log("Run export downloaded.", "good");
+      }
+      render();
+    }
+
+    function autoTargetIndex() {
+      const alive = state.enemies
+        .map((enemy, index) => ({ enemy, index }))
+        .filter(({ enemy }) => enemy.hp > 0);
+      if (!alive.length) return -1;
+
+      const priority = ({ enemy }) => {
+        const supportBonus = enemy.tags.includes("mage-support") ? 3.6 : 0;
+        const spellBonus = ["heal", "shield", "invisibility"].includes(enemy.intent) ? 1.2 : 0;
+        const intentMultiplier = enemy.intent === "heavy" ? 2 : 1;
+        const effectiveHp = enemy.hp + (enemy.shield || 0);
+        return [
+          (enemyIntentDamage(enemy) * intentMultiplier + supportBonus + spellBonus) / Math.max(effectiveHp, 0.1),
+          -effectiveHp
+        ];
+      };
+
+      return alive.reduce((best, current) => {
+        const bestPriority = priority(best);
+        const currentPriority = priority(current);
+        return currentPriority[0] > bestPriority[0]
+          || (currentPriority[0] === bestPriority[0] && currentPriority[1] > bestPriority[1])
+          ? current
+          : best;
+      }).index;
+    }
+
+    function bestFocusedAction(enemy) {
+      return ["attack", "heavy", "quick"]
+        .filter(canAffordAction)
+        .map(action => ({ action, value: expectedPlayerDamage(enemy, action) }))
+        .sort((a, b) => b.value - a.value)[0];
+    }
+
+    function shouldQuickBoss(target) {
+      if (!canAffordAction("quick") || !target || !target.tags.includes("boss") || target.intent === "guard") return false;
+      if (target.intent === "heavy") return true;
+      const quickDamage = expectedPlayerDamage(target, "quick");
+      const bestDamage = Math.max(
+        expectedPlayerDamage(target, "attack"),
+        expectedPlayerDamage(target, "heavy"),
+        quickDamage
+      );
+      const quickHit = playerHitChance(target, "quick");
+      const heavyHit = playerHitChance(target, "heavy");
+      return quickDamage >= bestDamage * 0.72 && quickHit >= heavyHit + 0.12;
+    }
+
+    function shouldHeavySingleTarget(target, incoming) {
+      if (!canAffordAction("heavy") || !target || target.intent === "guard") return false;
+      const heavyPayoff = (state.player.weapon.sunderOnHit || 0) > 0
+        || (state.player.weapon.sunderOnHeavyHit || 0) > 0
+        || (state.player.weapon.stunOnHeavyHitChance || 0) > 0
+        || (state.player.weapon.heavyDamageMultiplier || 1) >= 1.12;
+      const incomingSafe = incoming < Math.max(state.player.hp * 0.28, state.player.maxHp * 0.18);
+      return heavyPayoff
+        && incomingSafe
+        && expectedPlayerDamage(target, "heavy") >= expectedPlayerDamage(target, "attack") * 1.20
+        && playerHitChance(target, "heavy") >= playerHitChance(target, "attack") - 0.22;
+    }
+
+    function shouldHeavyDefault(target, incoming) {
+      if (!canAffordAction("heavy") || !target || target.intent === "guard") return false;
+      const incomingSafe = incoming < Math.max(state.player.hp * 0.28, state.player.maxHp * 0.18);
+      return incomingSafe
+        && expectedPlayerDamage(target, "heavy") >= expectedPlayerDamage(target, "attack") * 1.30
+        && playerHitChance(target, "heavy") >= playerHitChance(target, "attack") - 0.20;
+    }
+
+    function shouldQuickSingleTarget(target) {
+      if (!canAffordAction("quick") || !target || target.intent === "guard") return false;
+      return expectedPlayerDamage(target, "quick") >= expectedPlayerDamage(target, "attack") * 0.82
+        && playerHitChance(target, "quick") >= playerHitChance(target, "attack") + 0.08;
+    }
+
+    function autoCombatChoice() {
+      const alive = state.enemies.filter(enemy => enemy.hp > 0);
+      if (!alive.length) return null;
+
+      const targetIndex = autoTargetIndex();
+      const target = state.enemies[targetIndex];
+      const finisher = bestFocusedAction(target);
+      if (finisher && finisher.value >= (target.hp + (target.shield || 0)) * 0.90) {
+        return { action: finisher.action, targetIndex };
+      }
+
+      const incoming = alive.reduce((sum, enemy) => sum + enemyIntentDamage(enemy), 0);
+      if (riposteAutoAvailable(alive) && incoming >= Math.max(state.player.hp * 0.42, state.player.maxHp * 0.28)) {
+        return { action: "ability", targetIndex: -1 };
+      }
+
+      const heavyTargets = state.enemies
+        .map((enemy, index) => ({ enemy, index }))
+        .filter(({ enemy }) => enemy.hp > 0 && enemy.intent === "heavy");
+      if (canAffordAction("quick") && heavyTargets.length && (
+        state.player.dexterity >= 7
+        || heavyTargets.some(({ enemy }) => enemy.tags.includes("boss"))
+      )) {
+        const heavyTarget = heavyTargets.reduce((best, current) =>
+          enemyIntentDamage(current.enemy) > enemyIntentDamage(best.enemy) ? current : best
+        );
+        return { action: "quick", targetIndex: heavyTarget.index };
+      }
+
+      if (incoming >= Math.max(state.player.hp * 0.42, state.player.maxHp * 0.28)) {
+        return { action: "guard", targetIndex: -1 };
+      }
+
+      if (alive.length > 1) {
+        const bestSingleTarget = Math.max(...alive.flatMap(enemy => [
+          expectedPlayerDamage(enemy, "attack"),
+          expectedPlayerDamage(enemy, "heavy"),
+          expectedPlayerDamage(enemy, "quick")
+        ]));
+        if (canAffordAction("sweep") && expectedSweepDamage() >= bestSingleTarget * TACTICAL.sweepAutoDamageRatio) {
+          return { action: "sweep", targetIndex: -1 };
+        }
+      }
+
+      if (target.intent === "guard" && canAffordAction("heavy")) return { action: "heavy", targetIndex };
+      if (shouldQuickBoss(target)) return { action: "quick", targetIndex };
+      if (canAffordAction("quick") && state.player.dexterity > state.player.strength && state.player.dexterity >= 7.5) {
+        return { action: "quick", targetIndex };
+      }
+      if (shouldHeavySingleTarget(target, incoming)) {
+        return { action: "heavy", targetIndex };
+      }
+      if (shouldHeavyDefault(target, incoming)) return { action: "heavy", targetIndex };
+      if (shouldQuickSingleTarget(target)) return { action: "quick", targetIndex };
+      if (
+        canAffordAction("heavy")
+        && state.player.strength >= 7
+        && incoming < Math.max(state.player.hp * 0.28, state.player.maxHp * 0.18)
+        && expectedPlayerDamage(target, "heavy") >= expectedPlayerDamage(target, "attack") * 1.24
+        && playerHitChance(target, "heavy") >= playerHitChance(target, "attack") - 0.08
+      ) {
+        return { action: "heavy", targetIndex };
+      }
+      return { action: "attack", targetIndex };
+    }
+
+    function autoAction() {
+      if (state.phase === "loot") {
+        const scored = state.draft
+          .map((item, index) => ({ index, score: lootChoiceScore(item) }))
+          .sort((a, b) => b.score - a.score);
+        if (!scored.length || scored[0].score <= LOOT.minimumUpgradeScore) {
+          skipLoot();
+        } else {
+          chooseLoot(scored[0].index);
+        }
+        return;
+      }
+      if (state.phase !== "combat") return;
+      const choice = autoCombatChoice();
+      if (choice) {
+        if (choice.targetIndex >= 0) state.selected = choice.targetIndex;
+        useAction(choice.action);
+      }
+    }
+
+    function spriteStyle(sprite) {
+      const x = sprite.col * 16 * SHEET_SCALE;
+      const y = sprite.row * 16 * SHEET_SCALE;
+      return [
+        `background-image:url('${ITEM_SHEET_URL}')`,
+        `background-position: -${x}px -${y}px`
+      ].join(";");
+    }
+
+    function creatureSpriteStyle(frame, scale = 2) {
+      const sheet = CREATURE_CATALOG.sheets?.creatures;
+      if (!sheet || !frame) return "";
+      const imageUrl = (CREATURE_SHEET_URL || `file://${sheet.source_image}`).replaceAll("'", "%27");
+      return [
+        `background-image:url('${imageUrl}')`,
+        `background-size:${sheet.width * scale}px ${sheet.height * scale}px`,
+        `background-position:-${Number(frame.x || 0) * scale}px -${Number(frame.y || 0) * scale}px`,
+        `width:${Number(frame.w || 24) * scale}px`,
+        `height:${Number(frame.h || 24) * scale}px`
+      ].join(";");
+    }
+
+    function enemyAvatar(enemy) {
+      const initial = enemy.name.split(" ").slice(-1)[0].slice(0, 1);
+      if (!enemy.visualFrame) return `<div class="avatar">${initial}</div>`;
+      return `<div class="avatar"><span class="enemy-sprite" style="${creatureSpriteStyle(enemy.visualFrame)}"></span></div>`;
+    }
+
+    function renderRooms() {
+      $("rooms").innerHTML = dungeon.map((room, index) => {
+        const classes = ["room"];
+        if (room.isBoss) classes.push("boss");
+        if (index === state.roomIndex) classes.push("current");
+        if (index < state.roomIndex) classes.push("cleared");
+        const floorRoom = index % (DUNGEON.encountersPerLevel + 1);
+        const label = room.isBoss ? `L${room.level}B` : `P${room.powerLevel || "?"}`;
+        return `<div class="${classes.join(" ")}" title="Room ${index + 1} · ${roomKindLabel(room)}">${label}</div>`;
+      }).join("");
+    }
+
+    function renderEnemies() {
+      $("enemyList").innerHTML = state.enemies.map((enemy, index) => {
+        const hpPct = enemy.maxHp > 0 ? clamp(enemy.hp / enemy.maxHp, 0, 1) : 0;
+        const classes = ["enemy"];
+        if (index === state.selected) classes.push("selected");
+        if (enemy.hp <= 0) classes.push("dead");
+        if (enemy.riposted) classes.push("riposted");
+        const shieldText = enemy.shield > 0 ? ` · Shield ${humanHp(enemy.shield)}` : "";
+        const invisibleText = enemy.invisible ? " · hidden" : "";
+        const riposteText = enemy.riposted ? " · riposted" : "";
+        const hpText = `${humanHp(enemy.hp)} / ${humanHp(enemy.maxHp)} HP${enemy.shield > 0 ? ` · +${humanHp(enemy.shield)} shield` : ""}`;
+        return `<article class="${classes.join(" ")}" data-enemy="${index}">
+          ${enemyAvatar(enemy)}
+          <div>
+            <div class="enemy-name">${enemy.name}</div>
+            <div class="intent ${enemy.intent}">${enemy.intent}${enemy.aimed ? " +" : ""}${enemy.sunder ? ` · Sunder ${enemy.sunder}` : ""}${shieldText}${invisibleText}${riposteText}</div>
+            <div class="bar"><span style="width:${hpPct * 100}%"></span></div>
+            <div class="muted" style="font-size:12px;margin-top:4px">${hpText}</div>
+          </div>
+        </article>`;
+      }).join("");
+      document.querySelectorAll("[data-enemy]").forEach(node => {
+        node.addEventListener("click", () => {
+          const index = Number(node.dataset.enemy);
+          if (state.enemies[index].hp > 0) {
+            state.selected = index;
+            render();
+          }
+        });
+      });
+    }
+
+    function renderLoot() {
+      if (state.phase !== "loot") {
+        $("lootGrid").innerHTML = "";
+        return;
+      }
+      const cards = state.draft.map((item, index) => {
+        const delta = lootChoiceScore(item);
+        const deltaClass = delta > LOOT.minimumUpgradeScore
+          ? "good"
+          : delta < -LOOT.minimumUpgradeScore
+            ? "bad"
+            : "warn";
+        const deltaText = item.kind === "consumable"
+          ? (delta > 0 ? "useful heal now" : "no missing HP")
+          : delta > LOOT.minimumUpgradeScore
+            ? `${SLOT_LABELS[slotForItem(item)] || "Gear"} upgrade`
+            : delta < -LOOT.minimumUpgradeScore
+              ? `${SLOT_LABELS[slotForItem(item)] || "Gear"} downgrade`
+              : "sidegrade";
+        return `
+        <button class="loot-card ${item.kind} ${rarityClass(item)}" data-loot="${index}">
+          <span class="sprite" style="${spriteStyle(item.sprite)}"></span>
+          <span>
+            <span class="loot-name">${item.name}</span>
+            <span class="loot-desc">${item.desc}</span>
+            <span class="loot-delta ${deltaClass}">${deltaText}</span>
+          </span>
+        </button>
+      `;
+      });
+      cards.push(`
+        <button class="loot-card skip" data-skip-loot="true">
+          <span>
+            <span class="loot-name">Keep current gear</span>
+            <span class="loot-desc">Continue without swapping equipment.</span>
+          </span>
+        </button>
+      `);
+      $("lootGrid").innerHTML = cards.join("");
+      document.querySelectorAll("[data-loot]").forEach(node => {
+        node.addEventListener("click", () => chooseLoot(Number(node.dataset.loot)));
+      });
+      const skip = document.querySelector("[data-skip-loot]");
+      if (skip) skip.addEventListener("click", skipLoot);
+    }
+
+    function renderLog() {
+      const logNode = $("log");
+      logNode.innerHTML = state.log
+        .map(entry => `<div class="log-entry ${entry.cls}">${entry.text}</div>`)
+        .join("");
+      logNode.scrollTop = logNode.scrollHeight;
+    }
+
+    function renderActionButtons() {
+      const target = state.enemies[state.selected] && state.enemies[state.selected].hp > 0
+        ? state.enemies[state.selected]
+        : state.enemies.find(enemy => enemy.hp > 0);
+      const labels = {
+        attack: "Attack",
+        heavy: (state.player.weapon.sunderOnHit || state.player.weapon.stunOnHeavyHitChance) ? "Slam" : "Heavy",
+        quick: "Quick",
+        sweep: "Sweep",
+        guard: "Guard",
+        ability: activeAbility()?.name || "Ability"
+      };
+      const live = state.phase === "combat" && state.player.hp > 0;
+      const incoming = expectedIncomingDamage(false);
+      const guarded = expectedIncomingDamage(true);
+      const riposted = expectedIncomingDamage("ability");
+      const riposteReady = riposteAutoAvailable();
+
+      document.querySelectorAll("[data-action]").forEach(button => {
+        const action = button.dataset.action;
+        const manaCost = actionManaCost(action);
+        const manaText = manaCost > 0 ? `${manaCost} MP` : "free";
+        const affordable = canAffordAction(action);
+        let meta = manaText;
+        let extra = "";
+        let extraClass = "";
+
+        if (live && action === "ability") {
+          const ability = activeAbility();
+          if (ability) {
+            meta = `${manaText} · charges ${state.player.abilityCharges || 0}/${ability.charges}`;
+            extra = !affordable
+              ? `need ${manaCost} MP`
+              : incoming > 0
+                ? `${abilityComment(ability)} · ${humanDamage(incoming)} -> ${humanDamage(riposted)}`
+                : abilityComment(ability);
+            if (abilityAvailable() && !riposteReady && (ability.manaCost || 0) > 0) {
+              extra = `${extra} · save for elite/tank/boss`;
+            }
+            extraClass = riposteReady ? "good" : affordable ? "warn" : "bad";
+          } else {
+            meta = "not learned";
+            extra = "no class ability";
+            extraClass = "warn";
+          }
+        } else if (live && action === "guard") {
+          meta = incoming > 0 ? `${manaText} · incoming ${humanDamage(incoming)} -> ${humanDamage(guarded)}` : `${manaText} · no incoming`;
+          extra = "best into heavy / group damage";
+          extraClass = incoming > 0 ? "good" : "";
+        } else if (live && action === "sweep") {
+          const liveEnemies = state.enemies.filter(enemy => enemy.hp > 0);
+          const aliveCount = liveEnemies.length;
+          const sweepTotal = expectedSweepDamage();
+          const sweepEach = aliveCount ? sweepTotal / aliveCount : 0;
+          meta = `${manaText} · no crit · ${humanDamage(sweepEach)} each`;
+          extra = !affordable
+            ? `need ${manaCost} MP`
+            : aliveCount > 1
+              ? `~${humanDamage(sweepTotal)} total · DEX x${fmt(actionDamageMultiplier("sweep"), 2)}`
+              : "weak single-target";
+          extraClass = !affordable ? "bad" : aliveCount > 1 ? "good" : "warn";
+        } else if (live && target) {
+          let damage = expectedPlayerDamage(target, action);
+          if (action === "quick") {
+            damage += doubleStrikeChance() * expectedPlayerDamage(
+              target,
+              action,
+              TACTICAL.doubleStrikeDamageMultiplier,
+              false
+            );
+          }
+          meta = `${manaText} · ${humanDamageRange(damage)} dmg`;
+          if (!affordable) {
+            extra = `need ${manaCost} MP`;
+            extraClass = "bad";
+          } else if (action === "heavy") {
+            const penalty = heavyEvasionHitPenalty(target);
+            const sunderAdded = sunderAddedByAction(action);
+            if (sunderAdded > 0) {
+              extra = `slam: +${sunderAdded} Sunder${target.sunder ? " · amplified" : ""}`;
+              extraClass = "good";
+            } else if (state.player.weapon.stunOnHeavyHitChance) {
+              extra = "slam: can stun";
+              extraClass = "good";
+            } else {
+              extra = target.intent === "guard"
+                ? "punches through guard"
+                : penalty > 0
+                  ? "weaker into evasive targets"
+                  : "burst, risky";
+              extraClass = target.intent === "guard" ? "good" : penalty > 0 ? "bad" : "warn";
+            }
+          } else if (action === "quick") {
+            extra = quickPressureNote(target);
+            extraClass = "pressure";
+          } else {
+            const sunderAdded = sunderAddedByAction(action);
+            extra = sunderAdded > 0
+              ? `crush: +${sunderAdded} Sunder${target.sunder ? " · amplified" : ""}`
+              : "stable baseline";
+            extraClass = sunderAdded > 0 ? "good" : "";
+          }
+        }
+
+        button.innerHTML = `
+          <span class="action-title">${labels[action]}</span>
+          <span class="action-meta">${meta}</span>
+          <span class="action-extra ${extraClass}">${extra}</span>
+        `;
+        const actionReady = action === "ability" ? abilityAvailable() : affordable;
+        button.classList.toggle("pressure-ready", live && action === "quick" && affordable);
+        button.classList.toggle("riposte-ready", live && action === "ability" && riposteReady);
+        button.disabled = !live || !actionReady;
+      });
+    }
+
+    function render() {
+      renderRooms();
+      const room = dungeon[state.roomIndex];
+      $("encounterTitle").textContent = room ? `R${state.roomIndex + 1} · L${room.level} ${roomKindLabel(room)}` : "Cleared";
+      $("phaseValue").textContent = state.phase;
+      $("roundValue").textContent = String(state.round);
+      $("hpValue").textContent = humanHp(state.player.hp);
+      $("maxHpValue").textContent = humanHp(state.player.maxHp);
+      $("manaValue").textContent = humanMana(state.player.mana);
+      $("maxManaValue").textContent = humanMana(state.player.maxMana);
+      $("strValue").textContent = humanStat(state.player.strength);
+      $("dexValue").textContent = humanStat(state.player.dexterity);
+      $("weaponValue").textContent = state.player.weapon.name;
+      $("characterSelect").value = selectedCharacterId;
+      $("buildTag").textContent = `character: ${activeCharacter().name}`;
+      $("lootCount").textContent = `${state.player.items.length}/${LOOT.wearableSlotLimit} · ${state.player.stash.length}/${LOOT.stashSlotLimit}`;
+      $("hpBar").style.width = `${clamp(state.player.hp / state.player.maxHp, 0, 1) * 100}%`;
+      $("manaBar").style.width = `${clamp(state.player.mana / state.player.maxMana, 0, 1) * 100}%`;
+      const target = state.enemies[state.selected];
+      $("targetValue").textContent = target && target.hp > 0 ? target.name.split(" ").slice(-2).join(" ") : "-";
+      renderEnemies();
+      renderLoot();
+      renderLog();
+      renderActionButtons();
+    }
+
+    function reset() {
+      dungeon = buildDungeon();
+      state.roomIndex = 0;
+      state.phase = "combat";
+      state.round = 1;
+      state.selected = 0;
+      state.trainingBudget = DUNGEON.initialStatBudget;
+      state.player = {
+        maxHp: STATS.baseHp,
+        hp: STATS.baseHp,
+        maxMana: maxManaForPlayer(),
+        mana: startingManaForPlayer(),
+        strength: STATS.baseStrength,
+        dexterity: STATS.baseDexterity,
+        startingWeapon: makeStarterWeapon(),
+        weapon: makeStarterWeapon(),
+        abilityCharges: activeAbility()?.charges || 0,
+        items: [],
+        stash: [],
+        consumed: 0
+      };
+      state.levelPool = null;
+      state.enemies = [];
+      state.draft = [];
+      state.log = [];
+      state.debug = createDebugState();
+      startRoom();
+    }
+
+    document.querySelectorAll("[data-action]").forEach(button => {
+      button.addEventListener("click", () => useAction(button.dataset.action));
+    });
+    $("resetBtn").addEventListener("click", reset);
+    $("autoBtn").addEventListener("click", autoAction);
+    $("exportBtn").addEventListener("click", exportRun);
+    $("characterSelect").addEventListener("input", () => {
+      const nextCharacter = CHARACTER_ROSTER[$("characterSelect").value];
+      if (!nextCharacter || !nextCharacter.unlocked) {
+        $("characterSelect").value = selectedCharacterId;
+        return;
+      }
+      selectedCharacterId = $("characterSelect").value;
+      reset();
+    });
+
+    reset();
+  </script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+{
+  "version": "0.1.0",
+  "updated_at": "2026-07-03",
+  "status": "historical_reference_react_engine_is_canonical",
+  "canonical_runtime": "src/features/playtest/engine",
+  "react_metrics_status": "react_engine_probe_available_in_src_features_playtest_engine_sim",
+  "sample": {
+    "source": "python_simulator_and_legacy_html_model",
+    "canonical_for_current_react_game": false,
+    "runs": 10000,
+    "seed": 920000,
+    "character": "Balanced Swordsman",
+    "build": "balanced",
+    "starting_weapon": "Iron Sword",
+    "action_policy": "skilled",
+    "loot_policy": "weighted",
+    "encounter_model": "randomized_power_bands_with_strict_bosses",
+    "enemy_attack_rule": "always_connect"
+  },
+  "core_metrics": {
+    "win_rate": 0.0,
+    "avg_rooms_cleared": 9.0047,
+    "rooms_p50": 7.0,
+    "rooms_p75": 9.0,
+    "rooms_p90": 15.0,
+    "rooms_p95": 15.0,
+    "rooms_p99": 23.0
+  },
+  "floor_reach_rates": {
+    "reach_l2_rate": 0.3136,
+    "reach_l3_rate": 0.0421,
+    "reach_l4_rate": 0.0042,
+    "reach_l5_rate": 0.0001
+  },
+  "boss_gates": {
+    "reach_l1_boss_rate": 0.9846,
+    "clear_l1_boss_rate": 0.3136,
+    "reach_l2_boss_rate": 0.1599,
+    "clear_l2_boss_rate": 0.0421,
+    "reach_l3_boss_rate": 0.0224,
+    "clear_l3_boss_rate": 0.0042,
+    "reach_l4_boss_rate": 0.0028,
+    "clear_l4_boss_rate": 0.0001,
+    "reach_l5_boss_rate": 0.0001,
+    "clear_l5_boss_rate": 0.0
+  },
+  "conditional_boss_pass_rates": {
+    "l1_boss_clear_given_reached": 0.31850497664026,
+    "l2_boss_clear_given_reached": 0.2632895559724828,
+    "l3_boss_clear_given_reached": 0.1875,
+    "l4_boss_clear_given_reached": 0.03571428571428572,
+    "l5_boss_clear_given_reached": 0.0
+  },
+  "weapon_lift_sample": {
+    "status": "needs_refresh_after_riposte_and_action_spread_patch",
+    "runs_per_weapon": 3000,
+    "seed": 940000,
+    "rows": [
+      {
+        "weapon": "Iron Sword",
+        "win_rate": 0.0277,
+        "reach_l3_boss_rate": 0.198,
+        "reach_l4_boss_rate": 0.0573,
+        "reach_l5_rate": 0.04,
+        "rooms_p90": 23.0,
+        "win_lift_points": 0.0,
+        "l3_boss_lift_points": 0.0
+      },
+      {
+        "weapon": "Crushing Axe",
+        "win_rate": 0.032,
+        "reach_l3_boss_rate": 0.224,
+        "reach_l4_boss_rate": 0.064,
+        "reach_l5_rate": 0.045,
+        "rooms_p90": 23.0,
+        "win_lift_points": 0.43,
+        "l3_boss_lift_points": 2.6
+      },
+      {
+        "weapon": "Stunning Axe",
+        "win_rate": 0.0367,
+        "reach_l3_boss_rate": 0.2297,
+        "reach_l4_boss_rate": 0.069,
+        "reach_l5_rate": 0.049,
+        "rooms_p90": 23.0,
+        "win_lift_points": 0.9,
+        "l3_boss_lift_points": 3.17
+      },
+      {
+        "weapon": "Heavy Axe",
+        "win_rate": 0.032,
+        "reach_l3_boss_rate": 0.223,
+        "reach_l4_boss_rate": 0.064,
+        "reach_l5_rate": 0.045,
+        "rooms_p90": 23.0,
+        "win_lift_points": 0.43,
+        "l3_boss_lift_points": 2.5
+      },
+      {
+        "weapon": "Needle Rapier",
+        "win_rate": 0.0397,
+        "reach_l3_boss_rate": 0.2413,
+        "reach_l4_boss_rate": 0.0683,
+        "reach_l5_rate": 0.0513,
+        "rooms_p90": 23.0,
+        "win_lift_points": 1.2,
+        "l3_boss_lift_points": 4.33
+      }
+    ]
+  },
+  "interpretation": [
+    "This is a historical Python/legacy reference sample, not the current React balance gate.",
+    "After enemy attacks were changed to always connect, the Python reference landed at 0.0% final wins in this 10K sample. Do not tune React toward this baseline.",
+    "The native React engine in src/features/playtest/engine is canonical; use estimateReactWinRate for current win-rate claims.",
+    "Historical Python midgame reference after the no-miss pass: 2.24% of runs reached the L3 boss, 0.28% reached the L4 boss, and p95 reached room 15.",
+    "Mana-costed Riposte is now reserved by Auto for elite, tank, hp-check, and boss-style threats.",
+    "The weapon-lift rows are retained for context but need a fresh run through the React engine."
+  ]
+}

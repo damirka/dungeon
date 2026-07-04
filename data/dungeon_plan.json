@@ -1,0 +1,16 @@
+{
+  "version": "0.1.0",
+  "levels": {
+    "2": {
+      "custom": true,
+      "enemies": [],
+      "boss": "cre_p01_c17",
+      "updated_at": "2026-07-03T20:45:41.369Z"
+    }
+  },
+  "curation": {
+    "latest_live_save_at": "2026-07-03T22:45:51.540Z",
+    "latest_live_update_seen": "2026-07-03T22:45:51.540Z",
+    "latest_live_save_source": "dungeon_workspace"
+  }
+}

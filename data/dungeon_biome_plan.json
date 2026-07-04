@@ -1,0 +1,47 @@
+{
+  "version": "0.1.0",
+  "updated_at": "2026-06-29",
+  "design_note": "Dungeon level identity should follow available Oryx creature/environment assets. Enemy lists are intentionally incomplete until mapper curation catches up.",
+  "progression": [
+    {
+      "level": 1,
+      "biome": "forest",
+      "enemy_groups": ["bandits", "butcher", "cook", "royal_guards"],
+      "mapping_status": "partial",
+      "notes": "Early human faction space; good tutorial biome for readable melee and simple support units."
+    },
+    {
+      "level": 2,
+      "biome": "sand",
+      "enemy_groups": ["sand_bandits", "centurions"],
+      "mapping_status": "tbd",
+      "notes": "Third creature row appears to contain the likely sand-bandit and centurion set."
+    },
+    {
+      "level": 3,
+      "biome": "stone_volcanic",
+      "enemy_groups": ["vikings", "demons"],
+      "mapping_status": "partial",
+      "notes": "Should push heavier damage, burn, armor, and volcanic/stone encounter texture."
+    },
+    {
+      "level": 4,
+      "biome": "castle",
+      "enemy_groups": ["lizard_warriors", "elves"],
+      "mapping_status": "partial",
+      "notes": "A late mid-game tactical biome with high DEX enemies, guards, and elite formations."
+    },
+    {
+      "level": 5,
+      "biome": "dungeon_jail",
+      "enemy_groups": ["undead", "zombies", "skeletons", "vampires"],
+      "mapping_status": "partial",
+      "notes": "Final destination identity; should lean into attrition, revive/curse flavor, and boss pressure."
+    }
+  ],
+  "future_paths": {
+    "enabled": false,
+    "intent": "Eventually allow multiple routes to the final dungeon/jail through alternate biome chains with different enemy pools and loot textures.",
+    "example_shape": "forest -> sand or stone_volcanic -> castle -> dungeon_jail"
+  }
+}

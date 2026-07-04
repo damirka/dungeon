@@ -1,0 +1,1854 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Creature / FX Mapper</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101314;
+      --panel: #171b1d;
+      --panel-2: #20262a;
+      --panel-3: #283136;
+      --text: #eef3ef;
+      --muted: #a7b0aa;
+      --line: #354046;
+      --accent: #9cdb78;
+      --accent-2: #8bbcff;
+      --warn: #ffd166;
+      --bad: #ff7a6c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, select, textarea, .button-link { font: inherit; }
+
+    button, .button-link {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 7px 10px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button:hover, .button-link:hover { border-color: var(--accent-2); }
+    button.primary { background: #203024; border-color: #4c7452; color: #dffbd8; }
+    button.danger { border-color: #70433e; color: #ffd7d2; }
+    button.toggle.active { background: #172918; border-color: #4f7442; color: #dffbd8; }
+
+    input, select, textarea {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0b0e0f;
+      color: var(--text);
+      padding: 7px 9px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 74px;
+      resize: vertical;
+      line-height: 1.35;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(16, 19, 20, 0.96);
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .header-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .save-state {
+      min-width: 132px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(560px, 1.55fr) minmax(380px, 0.95fr);
+      min-height: 0;
+    }
+
+    .left, .right {
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .left {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      border-right: 1px solid var(--line);
+      background: #0e1112;
+    }
+
+    .right {
+      overflow: auto;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 140px minmax(180px, 1fr) 150px 150px 135px 140px 120px;
+      gap: 8px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .stats {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #0c0f10;
+      white-space: nowrap;
+    }
+
+    .pill.good { color: var(--accent); border-color: #4f7442; }
+    .pill.warn { color: var(--warn); border-color: #755f2e; }
+    .pill.blue { color: var(--accent-2); border-color: #3f5875; }
+
+    .workbench {
+      display: grid;
+      grid-template-columns: auto minmax(250px, 1fr);
+      min-height: 0;
+    }
+
+    .sheet-panel {
+      overflow: auto;
+      padding: 14px;
+      border-right: 1px solid var(--line);
+      background: #080a0b;
+    }
+
+    .sheet-frame {
+      position: relative;
+      image-rendering: pixelated;
+    }
+
+    .sheet-frame img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      user-select: none;
+    }
+
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,0.12) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.12) 1px, transparent 1px);
+      pointer-events: none;
+    }
+
+    .game-usage-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .ignored-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .ignored-marker {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.50);
+      border: 1px solid rgba(255, 122, 108, 0.38);
+    }
+
+    .game-marker {
+      position: absolute;
+      border: 2px solid rgba(140, 221, 94, 0.86);
+      background: rgba(140, 221, 94, 0.12);
+      box-shadow: inset 0 0 0 1px #000, 0 0 0 1px rgba(140, 221, 94, 0.18);
+    }
+
+    .game-marker.boss {
+      border-color: rgba(255, 211, 107, 0.92);
+      background: rgba(255, 211, 107, 0.14);
+    }
+
+    .selection-box, .hover-box {
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .selection-box {
+      inset: 0;
+    }
+
+    .selection-marker {
+      position: absolute;
+      border: 2px solid var(--warn);
+      box-shadow: 0 0 0 1px #000;
+    }
+
+    .selection-marker.primary {
+      border-color: var(--accent-2);
+    }
+
+    .hover-box {
+      border: 2px solid var(--accent-2);
+      box-shadow: 0 0 0 1px #000;
+      border-color: var(--accent-2);
+      opacity: 0.75;
+    }
+
+    .tile-list {
+      min-height: 0;
+      overflow: auto;
+      padding: 10px;
+      display: grid;
+      align-content: start;
+      gap: 6px;
+      background: #0d1011;
+    }
+
+    .tile-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 48px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      cursor: pointer;
+    }
+
+    .tile-row:hover, .tile-row.selected {
+      border-color: var(--accent-2);
+      background: #16202a;
+    }
+
+    .tile-row.selected {
+      box-shadow: inset 3px 0 0 var(--warn);
+    }
+
+    .tile-row.primary-selected {
+      box-shadow: inset 3px 0 0 var(--accent-2);
+    }
+
+    .tile-row.in-game {
+      border-color: rgba(140, 221, 94, 0.46);
+      background: #132015;
+    }
+
+    .tile-row.in-game.selected {
+      border-color: var(--accent);
+      background: #172918;
+    }
+
+    .tile-row.ignored { opacity: 0.50; }
+
+    .sprite-strip {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .sprite-frame {
+      image-rendering: pixelated;
+      background-repeat: no-repeat;
+      background-color: #050607;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      flex: 0 0 auto;
+    }
+
+    .mini-frame {
+      min-width: 32px;
+      min-height: 32px;
+    }
+
+    .big-frame {
+      min-width: 96px;
+      min-height: 96px;
+      border-radius: 7px;
+    }
+
+    .tile-title {
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .tile-sub {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+      margin-top: 2px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--line);
+    }
+
+    .status-dot.live { background: var(--accent); }
+    .status-dot.planned { background: var(--accent-2); }
+    .status-dot.candidate { background: var(--warn); }
+    .status-dot.unmapped { background: var(--line); }
+    .status-dot.rejected, .status-dot.ignored { background: var(--bad); }
+
+    .editor-head {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .editor-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .editor-title h2 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+
+    .coord {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .form-grid .wide { grid-column: 1 / -1; }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0b0e0f;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .check-row input {
+      width: auto;
+      min-height: auto;
+      margin: 0;
+    }
+
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .choice-toggle {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0b0e0f;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .choice-toggle.active {
+      border-color: #4f7442;
+      background: #122016;
+      color: #dffbd8;
+    }
+
+    .choice-toggle.partial {
+      border-color: #755f2e;
+      background: #1c1710;
+      color: #ffe3a3;
+    }
+
+    .choice-toggle input {
+      width: auto;
+      min-height: auto;
+      margin: 0;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 16px 0 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .effect-list {
+      display: grid;
+      gap: 7px;
+    }
+
+    .effect-row {
+      display: grid;
+      grid-template-columns: minmax(125px, 1fr) 80px 36px;
+      gap: 7px;
+      align-items: center;
+    }
+
+    .tag-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 7px;
+      background: var(--panel-2);
+      color: #d7e2dc;
+      font-size: 11px;
+    }
+
+    .json-box {
+      min-height: 160px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .file-input { display: none; }
+
+    @media (max-width: 1120px) {
+      header { grid-template-columns: 1fr; }
+      .header-actions { justify-content: flex-start; }
+      main { grid-template-columns: 1fr; }
+      .left { border-right: 0; border-bottom: 1px solid var(--line); }
+      .right { max-height: none; }
+      .workbench { grid-template-columns: 1fr; }
+      .sheet-panel { border-right: 0; border-bottom: 1px solid var(--line); }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 680px) {
+      .toolbar, .form-grid { grid-template-columns: 1fr; }
+      .editor-head { grid-template-columns: 1fr; }
+      .sheet-panel { padding: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1 id="pageTitle">Creature / FX Mapper</h1>
+        <div class="header-meta" id="pageMeta">Creatures are mapped as two-frame vertical pairs; FX are mapped as component bounds.</div>
+      </div>
+      <div class="header-actions">
+        <span class="save-state" id="saveState">Loading...</span>
+        <a class="button-link" href="sprite_meaning_mapper.html">Items</a>
+        <button id="gameHighlightBtn" class="toggle" title="Toggle tactical-sim green highlights">Game Highlight: On</button>
+        <button id="copyJsonBtn">Copy JSON</button>
+        <button id="exportBtn" class="primary">Export JSON</button>
+        <button id="importBtn">Import</button>
+        <button id="resetBtn" class="danger">Reset Seed</button>
+        <input id="importFile" class="file-input" type="file" accept="application/json,.json">
+      </div>
+    </header>
+
+    <main>
+      <section class="left">
+        <div class="toolbar">
+          <select id="sheetFilter"></select>
+          <input id="search" placeholder="Search name, id, category, role, effect">
+          <select id="categoryFilter"></select>
+          <select id="familyFilter"></select>
+          <select id="statusFilter"></select>
+          <select id="gameFilter">
+            <option value="all">All game usage</option>
+            <option value="in_game">In tactical sim</option>
+            <option value="not_in_game">Not in sim</option>
+          </select>
+          <select id="showFilter">
+            <option value="active">Active</option>
+            <option value="all">All</option>
+            <option value="ignored">Ignored</option>
+            <option value="unmapped">Unmapped</option>
+          </select>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div class="workbench">
+          <div class="sheet-panel">
+            <div class="sheet-frame" id="sheetFrame">
+              <img id="sheetImage" alt="Selected sprite sheet">
+              <div class="grid-overlay" id="gridOverlay"></div>
+              <div class="game-usage-overlay" id="gameOverlay"></div>
+              <div class="ignored-overlay" id="ignoredOverlay"></div>
+              <div class="hover-box" id="hoverBox" hidden></div>
+              <div class="selection-box" id="selectionBox"></div>
+            </div>
+          </div>
+          <div class="tile-list" id="tileList"></div>
+        </div>
+      </section>
+
+      <aside class="right">
+        <div class="editor-head">
+          <div class="sprite-strip" id="bigPreview"></div>
+          <div>
+            <div class="editor-title">
+              <h2 id="editorName">-</h2>
+              <span class="pill blue" id="editorStatus">-</span>
+            </div>
+            <div class="coord" id="editorCoord"></div>
+            <div class="tag-strip" id="editorTags"></div>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <label class="wide">Display name
+            <input id="nameInput">
+          </label>
+          <label>Category
+            <select id="categoryInput"></select>
+          </label>
+          <label>Visual family
+            <select id="familyInput"></select>
+          </label>
+          <label>Status
+            <select id="statusInput"></select>
+          </label>
+          <label>Engine role
+            <select id="engineRoleInput"></select>
+          </label>
+          <label>Combat profile
+            <select id="profileInput"></select>
+          </label>
+          <label>Dungeon level
+            <select id="dungeonLevelInput"></select>
+          </label>
+          <label>Creature level
+            <input id="unitLevelInput" type="number" min="0" step="1" placeholder="e.g. 3">
+          </label>
+          <label class="wide">Game pools
+            <div class="choice-grid" id="gamePoolPicker"></div>
+          </label>
+          <label class="wide">Boss slot
+            <select id="bossSlotInput"></select>
+          </label>
+          <label class="wide">Enemy spells
+            <div class="choice-grid" id="spellPicker"></div>
+          </label>
+          <label class="wide">Attack types
+            <div class="choice-grid" id="attackPicker"></div>
+          </label>
+          <label class="wide">Unit props
+            <input id="propsInput" placeholder="armored, fast, undead, poison">
+          </label>
+          <label class="wide">Meaning value
+            <input id="meaningInput" placeholder="e.g. L2 brute enemy, impact FX, poison telegraph">
+          </label>
+          <label class="wide">Rarity / encounter bands
+            <input id="rarityInput" placeholder="common, uncommon, rare">
+          </label>
+          <label class="wide">Encounter roles
+            <input id="rolesInput" placeholder="encounter_enemy, elite_enemy, boss_enemy">
+          </label>
+          <label class="wide">Tags
+            <input id="tagsInput" placeholder="undead, brute, poison">
+          </label>
+          <label class="wide">Notes
+            <textarea id="notesInput" placeholder="Design notes, uncertainty, animation read, encounter use"></textarea>
+          </label>
+          <label class="wide check-row">
+            <input id="ignoredInput" type="checkbox">
+            Ignore this sprite for generation
+          </label>
+        </div>
+
+        <div class="section-title">
+          <span>Effect / Behavior Recipe</span>
+          <button id="addEffectBtn">Add Effect</button>
+        </div>
+        <div class="effect-list" id="effectList"></div>
+
+        <div class="section-title">
+          <span>Selected Entry JSON</span>
+          <button id="normalizeBtn">Normalize Weights</button>
+        </div>
+        <textarea id="entryJson" class="json-box" readonly></textarea>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/data/tactical_enemy_visuals.js"></script>
+  <script src="/data/oryx_creature_fx_catalog_seed.js"></script>
+  <script>
+    const CATALOG = window.ORYX_CREATURE_FX_SEED_CATALOG || { sheets: {}, entries: [] };
+    const GAME_ENEMY_VISUALS = window.TACTICAL_ENEMY_VISUALS || { pools: {}, bosses: {} };
+    const ZOOM = 3;
+    const STORAGE_KEY = "dungeon_creature_fx_mapper_v1";
+    const SAVE_DEBOUNCE_MS = 180;
+    const LIVE_SAVE_ENDPOINT = "/api/save/creature-fx";
+    const TACTICAL_VISUALS_SAVE_ENDPOINT = "/api/save/tactical-visuals";
+    const LIVE_SAVE_ENABLED = location.protocol === "http:" || location.protocol === "https:";
+    const REQUESTED_SHEET = new URLSearchParams(location.search).get("sheet");
+    const LOCKED_SHEET = ["creatures", "fx"].includes(REQUESTED_SHEET) ? REQUESTED_SHEET : "";
+    const SHEET_ASSET_URLS = {
+      creatures: "/assets/oryx_creatures.png",
+      fx: "/assets/oryx_fx.png"
+    };
+
+    const CATEGORY_OPTIONS = [
+      "unmapped", "enemy_candidate", "minion_enemy", "encounter_enemy", "elite_enemy",
+      "boss_enemy", "hero", "npc", "summon", "companion", "combat_fx", "attack_fx",
+      "impact_fx", "status_fx", "telegraph_fx", "projectile_fx", "environment_fx",
+      "ui_marker", "loot_fx", "rejected"
+    ];
+    const FAMILY_OPTIONS = [
+      "unknown", "humanoid", "undead", "beast", "monster", "caster_or_spirit",
+      "large_monster", "small_creature_or_icon", "burst", "slash", "projectile",
+      "beam_or_marker", "splash", "fx_unknown", "creature_unknown"
+    ];
+    const STATUS_OPTIONS = ["unmapped", "candidate", "planned", "live", "rejected"];
+    const ROLE_OPTIONS = [
+      "unset", "encounter_enemy", "support_enemy", "elite_enemy", "boss_enemy",
+      "hero", "summon", "npc", "attack_fx", "impact_fx", "status_fx", "telegraph_fx",
+      "projectile_fx", "death_fx", "loot_fx", "hazard_fx", "ui_fx"
+    ];
+    const PROFILE_OPTIONS = [
+      "unset", "balanced", "hp", "strength", "dexterity", "tank", "brute",
+      "glass_cannon", "caster", "support", "swarm", "elite", "boss"
+    ];
+    const DUNGEON_LEVEL_OPTIONS = ["unset", "1", "2", "3", "4", "5"];
+    const GAME_POOL_OPTIONS = ["raider", "brute", "duelist", "stalker", "mage"];
+    const BOSS_SLOT_OPTIONS = ["none", "1", "2", "3", "4", "5"];
+    const SPELL_OPTIONS = ["heal", "shield", "invisibility"];
+    const ATTACK_TYPE_OPTIONS = [
+      "strike", "heavy", "quick", "sweep", "pierce", "aim", "guard",
+      "ranged", "burn", "poison", "freeze", "shock", "curse", "bleed",
+      "stun", "stagger", "sunder", "summon"
+    ];
+    const EFFECT_OPTIONS = [
+      "unset", "hp_budget", "damage_budget", "accuracy", "evasion", "armor",
+      "intent_strike", "intent_heavy", "intent_guard", "intent_aim", "intent_pierce",
+      "multi_enemy", "boss_phase", "summon", "heal", "guard", "pierce", "stun",
+      "stagger", "sunder", "burn", "poison", "freeze", "shock", "curse",
+      "bleed", "crit_chance", "crit_damage", "heavy_damage", "ranged",
+      "projectile", "telegraph", "impact", "death_fx", "loot_bonus"
+    ];
+
+    const $ = id => document.getElementById(id);
+    const els = {
+      sheetFilter: $("sheetFilter"),
+      search: $("search"),
+      categoryFilter: $("categoryFilter"),
+      familyFilter: $("familyFilter"),
+      statusFilter: $("statusFilter"),
+      gameFilter: $("gameFilter"),
+      showFilter: $("showFilter"),
+      stats: $("stats"),
+      sheetFrame: $("sheetFrame"),
+      sheetImage: $("sheetImage"),
+      gridOverlay: $("gridOverlay"),
+      gameOverlay: $("gameOverlay"),
+      ignoredOverlay: $("ignoredOverlay"),
+      hoverBox: $("hoverBox"),
+      selectionBox: $("selectionBox"),
+      tileList: $("tileList"),
+      rightPanel: document.querySelector(".right"),
+      bigPreview: $("bigPreview"),
+      editorName: $("editorName"),
+      editorStatus: $("editorStatus"),
+      editorCoord: $("editorCoord"),
+      editorTags: $("editorTags"),
+      nameInput: $("nameInput"),
+      categoryInput: $("categoryInput"),
+      familyInput: $("familyInput"),
+      statusInput: $("statusInput"),
+      engineRoleInput: $("engineRoleInput"),
+      profileInput: $("profileInput"),
+      dungeonLevelInput: $("dungeonLevelInput"),
+      unitLevelInput: $("unitLevelInput"),
+      gamePoolPicker: $("gamePoolPicker"),
+      bossSlotInput: $("bossSlotInput"),
+      spellPicker: $("spellPicker"),
+      attackPicker: $("attackPicker"),
+      propsInput: $("propsInput"),
+      meaningInput: $("meaningInput"),
+      rarityInput: $("rarityInput"),
+      rolesInput: $("rolesInput"),
+      tagsInput: $("tagsInput"),
+      notesInput: $("notesInput"),
+      ignoredInput: $("ignoredInput"),
+      effectList: $("effectList"),
+      entryJson: $("entryJson"),
+      saveState: $("saveState"),
+      exportBtn: $("exportBtn"),
+      copyJsonBtn: $("copyJsonBtn"),
+      gameHighlightBtn: $("gameHighlightBtn"),
+      importBtn: $("importBtn"),
+      importFile: $("importFile"),
+      resetBtn: $("resetBtn"),
+      addEffectBtn: $("addEffectBtn"),
+      normalizeBtn: $("normalizeBtn"),
+      pageTitle: $("pageTitle"),
+      pageMeta: $("pageMeta")
+    };
+
+    let state = null;
+    let selectedSheet = "creatures";
+    let selectedId = "";
+    let selectedIds = new Set();
+    let gameHighlightsVisible = localStorage.getItem(`${STORAGE_KEY}_game_highlights`) !== "off";
+    let saveTimer = null;
+    let loadMessage = "Loaded seed catalog";
+    let loadNeedsSave = false;
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function normalizeCsv(value) {
+      return value.split(",").map(part => part.trim()).filter(Boolean);
+    }
+
+    function numericOrNull(value) {
+      const text = String(value ?? "").trim();
+      if (!text || text === "unset") return null;
+      const number = Number(text);
+      return Number.isFinite(number) ? number : null;
+    }
+
+    function buildGameUsageMap() {
+      const usage = new Map();
+      const add = (id, label) => {
+        if (!id) return;
+        const labels = usage.get(id) || [];
+        labels.push(label);
+        usage.set(id, labels);
+      };
+      Object.entries(GAME_ENEMY_VISUALS.pools || {}).forEach(([profile, ids]) => {
+        (ids || []).forEach(id => add(id, `${profile} pool`));
+      });
+      Object.entries(GAME_ENEMY_VISUALS.bosses || {}).forEach(([level, id]) => {
+        add(id, `L${level} boss`);
+      });
+      return usage;
+    }
+
+    let gameUsageById = buildGameUsageMap();
+
+    function gameUsage(entry) {
+      return gameUsageById.get(entry.id) || [];
+    }
+
+    function refreshGameUsage() {
+      gameUsageById = buildGameUsageMap();
+    }
+
+    function protectedFromEnemyPools(entry) {
+      return entry.category === "hero";
+    }
+
+    function protectedSelectedEntries() {
+      return selectedEntries().filter(protectedFromEnemyPools);
+    }
+
+    function removeEntryFromGameVisuals(entry) {
+      let changed = false;
+      Object.values(GAME_ENEMY_VISUALS.pools || {}).forEach(ids => {
+        const before = ids.length;
+        ids.splice(0, ids.length, ...ids.filter(id => id !== entry.id));
+        changed = changed || ids.length !== before;
+      });
+      Object.keys(GAME_ENEMY_VISUALS.bosses || {}).forEach(level => {
+        if (GAME_ENEMY_VISUALS.bosses[level] === entry.id) {
+          delete GAME_ENEMY_VISUALS.bosses[level];
+          changed = true;
+        }
+      });
+      return changed;
+    }
+
+    function removeProtectedGameUsage(entries = selectedEntries()) {
+      const changed = entries.filter(protectedFromEnemyPools).some(removeEntryFromGameVisuals);
+      if (changed) {
+        refreshGameUsage();
+        saveTacticalVisuals("Removed hero game usage");
+      }
+      return changed;
+    }
+
+    function sheetInfo(sheetKey = selectedSheet) {
+      return CATALOG.sheets[sheetKey] || CATALOG.sheets.creatures || Object.values(CATALOG.sheets)[0];
+    }
+
+    function tileSize(sheetKey = selectedSheet) {
+      return Number(sheetInfo(sheetKey)?.tile_size || 16);
+    }
+
+    function sheetUrl(sheetKey = selectedSheet) {
+      if (LIVE_SAVE_ENABLED && SHEET_ASSET_URLS[sheetKey]) return SHEET_ASSET_URLS[sheetKey];
+      return `file://${sheetInfo(sheetKey).source_image}`;
+    }
+
+    function fillSelect(select, label, values) {
+      select.innerHTML = `<option value="">${label}</option>` + values.map(value => `<option value="${value}">${value}</option>`).join("");
+    }
+
+    function fillPlainSelect(select, values) {
+      select.innerHTML = values.map(value => `<option value="${value}">${value}</option>`).join("");
+    }
+
+    function fromSeedEntry(entry) {
+      return {
+        id: entry.id,
+        sheet: entry.sheet,
+        name: entry.name || "",
+        sprite: clone(entry.sprite),
+        animation: clone(entry.animation || { kind: "single", frames: [entry.sprite] }),
+        visual: clone(entry.visual || { family: "unknown" }),
+        category: entry.category || "unmapped",
+        engine_role: entry.engine_role || "unset",
+        status: entry.runtime_status || entry.status || "candidate",
+        ignored: Boolean(entry.ignored),
+        meaning: entry.meaning || "",
+        rarity_band: entry.rarity_band || [],
+        encounter_roles: entry.encounter_roles || [],
+        effects: entry.effect_recipe || entry.effects || [],
+        combat_profile: entry.combat_profile || "unset",
+        dungeon_level: entry.dungeon_level ?? null,
+        unit_level: entry.unit_level ?? null,
+        enemy_spells: entry.enemy_spells || [],
+        attack_types: entry.attack_types || [],
+        unit_props: entry.unit_props || [],
+        tags: entry.tags || [],
+        notes: entry.notes || "",
+        seed: clone(entry)
+      };
+    }
+
+    function buildSeedState() {
+      return {
+        version: CATALOG.version || "0.1.0",
+        seed_version: CATALOG.version || "0.1.0",
+        updated_at: new Date().toISOString(),
+        source: CATALOG.source || "oryx",
+        tile_sizes: CATALOG.tile_sizes || Object.fromEntries(Object.entries(CATALOG.sheets).map(([key, sheet]) => [key, sheet.tile_size])),
+        sheets: CATALOG.sheets,
+        detection: CATALOG.detection,
+        entries: (CATALOG.entries || []).map(fromSeedEntry)
+      };
+    }
+
+    function mergeState(saved, seed) {
+      const seedById = new Map(seed.entries.map(entry => [entry.id, entry]));
+      const savedById = new Map((saved.entries || []).map(entry => [entry.id, entry]));
+      const entries = seed.entries.map(seedEntry => {
+        const savedEntry = savedById.get(seedEntry.id);
+        if (!savedEntry) return seedEntry;
+        return {
+          ...seedEntry,
+          name: savedEntry.name ?? seedEntry.name,
+          category: savedEntry.category ?? seedEntry.category,
+          visual: { ...seedEntry.visual, family: savedEntry.visual?.family || savedEntry.family || seedEntry.visual.family },
+          engine_role: savedEntry.engine_role ?? seedEntry.engine_role,
+          status: savedEntry.status ?? seedEntry.status,
+          ignored: Boolean(savedEntry.ignored),
+          meaning: savedEntry.meaning ?? seedEntry.meaning,
+          rarity_band: savedEntry.rarity_band || seedEntry.rarity_band,
+          encounter_roles: savedEntry.encounter_roles || seedEntry.encounter_roles,
+          effects: savedEntry.effect_recipe || savedEntry.effects || seedEntry.effects,
+          combat_profile: savedEntry.combat_profile || seedEntry.combat_profile,
+          dungeon_level: savedEntry.dungeon_level ?? seedEntry.dungeon_level,
+          unit_level: savedEntry.unit_level ?? seedEntry.unit_level,
+          enemy_spells: savedEntry.enemy_spells || seedEntry.enemy_spells,
+          attack_types: savedEntry.attack_types || seedEntry.attack_types,
+          unit_props: savedEntry.unit_props || seedEntry.unit_props,
+          tags: savedEntry.tags || seedEntry.tags,
+          notes: savedEntry.notes ?? seedEntry.notes,
+          seed: seedEntry.seed
+        };
+      });
+      return {
+        ...seed,
+        updated_at: saved.updated_at || seed.updated_at,
+        entries
+      };
+    }
+
+    function compatibleDraft(saved, seed) {
+      if (saved.seed_version !== seed.seed_version) return false;
+      if (JSON.stringify(saved.tile_sizes || {}) !== JSON.stringify(seed.tile_sizes || {})) return false;
+      return true;
+    }
+
+    function loadState() {
+      const seed = buildSeedState();
+      const raw = localStorage.getItem(STORAGE_KEY);
+      loadMessage = "Loaded seed catalog";
+      loadNeedsSave = false;
+      if (!raw) return seed;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed.entries)) return seed;
+        if (!compatibleDraft(parsed, seed)) {
+          loadMessage = "Loaded corrected seed";
+          loadNeedsSave = true;
+          return seed;
+        }
+        loadMessage = "Loaded local draft";
+        return mergeState(parsed, seed);
+      } catch {
+        return seed;
+      }
+    }
+
+    function saveNow(reason = "Autosaved") {
+      state.updated_at = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(`${STORAGE_KEY}_sheet`, selectedSheet);
+      els.saveState.textContent = `${reason} ${new Date().toLocaleTimeString()}`;
+      saveToServer(reason);
+    }
+
+    async function saveToServer(reason = "Autosaved") {
+      if (!LIVE_SAVE_ENABLED) return;
+      const payload = exportState();
+      try {
+        const response = await fetch(LIVE_SAVE_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || `HTTP ${response.status}`);
+        }
+        els.saveState.textContent = `${reason} + disk ${new Date().toLocaleTimeString()}`;
+      } catch (error) {
+        els.saveState.textContent = `Local saved, disk sync failed: ${error.message}`;
+      }
+    }
+
+    function tacticalVisualsPayload() {
+      return {
+        pools: GAME_ENEMY_VISUALS.pools || {},
+        bosses: GAME_ENEMY_VISUALS.bosses || {},
+        protected_ids: state.entries.filter(protectedFromEnemyPools).map(entry => entry.id)
+      };
+    }
+
+    async function saveTacticalVisuals(reason = "Saved game usage") {
+      if (!LIVE_SAVE_ENABLED) return;
+      try {
+        const response = await fetch(TACTICAL_VISUALS_SAVE_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(tacticalVisualsPayload())
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || `HTTP ${response.status}`);
+        }
+        els.saveState.textContent = `${reason} + game disk ${new Date().toLocaleTimeString()}`;
+      } catch (error) {
+        els.saveState.textContent = `Game usage sync failed: ${error.message}`;
+      }
+    }
+
+    function scheduleSave(reason = "Saved") {
+      els.saveState.textContent = "Saving...";
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveNow(reason), SAVE_DEBOUNCE_MS);
+    }
+
+    function currentEntries() {
+      return state.entries.filter(entry => entry.sheet === selectedSheet);
+    }
+
+    function selectedEntries() {
+      const entries = state.entries.filter(entry => selectedIds.has(entry.id) && entry.sheet === selectedSheet);
+      if (entries.length) return entries;
+      const entry = selectedEntry();
+      return entry ? [entry] : [];
+    }
+
+    function selectedEntry() {
+      return state.entries.find(entry => entry.id === selectedId) || currentEntries()[0] || state.entries[0];
+    }
+
+    function entryLabel(entry) {
+      return entry.name || `${entry.ignored ? "Ignored" : "Unmapped"} ${entry.id}`;
+    }
+
+    function ensureSelection() {
+      const ids = new Set(currentEntries().map(entry => entry.id));
+      selectedIds = new Set([...selectedIds].filter(id => ids.has(id)));
+      if (!selectedId || !ids.has(selectedId)) {
+        selectedId = selectedIds.values().next().value || currentEntries().find(entry => !entry.ignored)?.id || currentEntries()[0]?.id || "";
+      }
+      if (selectedId && !selectedIds.size) selectedIds.add(selectedId);
+      if (selectedId && !selectedIds.has(selectedId)) selectedIds.add(selectedId);
+    }
+
+    function setSingleSelection(id) {
+      selectedId = id;
+      selectedIds = id ? new Set([id]) : new Set();
+    }
+
+    function toggleSelection(id) {
+      selectedId = id;
+      if (selectedIds.has(id) && selectedIds.size > 1) {
+        selectedIds.delete(id);
+        selectedId = selectedIds.values().next().value || id;
+      } else {
+        selectedIds.add(id);
+      }
+    }
+
+    function updateSelected(patch, reason = "Saved") {
+      const entries = selectedEntries();
+      entries.forEach(entry => {
+        Object.assign(entry, patch);
+      });
+      if (patch.category === "hero") {
+        removeProtectedGameUsage(entries);
+      }
+      scheduleSave(reason);
+      renderAll();
+    }
+
+    function updateSelectedVisualFamily(family) {
+      selectedEntries().forEach(entry => {
+        entry.visual.family = family;
+      });
+      scheduleSave("Saved");
+      renderAll();
+    }
+
+    function setSheet(sheetKey) {
+      if (LOCKED_SHEET && sheetKey !== LOCKED_SHEET) return;
+      selectedSheet = sheetKey;
+      setSingleSelection(currentEntries().find(entry => !entry.ignored)?.id || currentEntries()[0]?.id || "");
+      renderAll();
+      saveNow("Sheet saved");
+    }
+
+    function applyModeChrome() {
+      if (LOCKED_SHEET === "creatures") {
+        document.title = "Character Mapper";
+        els.pageTitle.textContent = "Character Mapper";
+        els.pageMeta.textContent = "Character units, combat profiles, boss slots, tactical pools, spells, and enemy metadata.";
+        els.sheetFilter.hidden = true;
+        return;
+      }
+      if (LOCKED_SHEET === "fx") {
+        document.title = "FX Mapper";
+        els.pageTitle.textContent = "FX Mapper";
+        els.pageMeta.textContent = "Combat effects, telegraphs, projectiles, impacts, status reads, and behavior recipes.";
+        els.sheetFilter.hidden = true;
+        return;
+      }
+      document.title = "Creature / FX Mapper";
+      els.pageTitle.textContent = "Creature / FX Mapper";
+      els.pageMeta.textContent = "Creatures are mapped as two-frame vertical pairs; FX are mapped as component bounds.";
+      els.sheetFilter.hidden = false;
+    }
+
+    function selectEntry(id, options = {}) {
+      if (options.additive) {
+        toggleSelection(id);
+      } else {
+        setSingleSelection(id);
+      }
+      renderAll();
+      if (options.scrollList) keepTileVisible(id);
+      if (options.resetEditor !== false) scrollEditorToTop();
+    }
+
+    function keepTileVisible(id) {
+      const node = els.tileList.querySelector(`[data-tile="${CSS.escape(id)}"]`);
+      if (!node) return;
+      const padding = 10;
+      const listTop = els.tileList.scrollTop;
+      const listBottom = listTop + els.tileList.clientHeight;
+      const nodeTop = node.offsetTop - padding;
+      const nodeBottom = node.offsetTop + node.offsetHeight + padding;
+      if (nodeTop < listTop) {
+        els.tileList.scrollTop = Math.max(0, nodeTop);
+      } else if (nodeBottom > listBottom) {
+        els.tileList.scrollTop = nodeBottom - els.tileList.clientHeight;
+      }
+    }
+
+    function scrollEditorToTop() {
+      if (els.rightPanel) els.rightPanel.scrollTop = 0;
+    }
+
+    function frameStyle(sheetKey, frame, scale) {
+      const sheet = sheetInfo(sheetKey);
+      const sizeX = sheet.width * scale;
+      const sizeY = sheet.height * scale;
+      const frameWidth = Number(frame.w || tileSize(sheetKey));
+      const frameHeight = Number(frame.h || tileSize(sheetKey));
+      const imageUrl = sheetUrl(sheetKey).replaceAll("'", "%27");
+      return [
+        `background-image:url('${imageUrl}')`,
+        `background-size:${sizeX}px ${sizeY}px`,
+        `background-position:-${Number(frame.x || 0) * scale}px -${Number(frame.y || 0) * scale}px`,
+        `width:${frameWidth * scale}px`,
+        `height:${frameHeight * scale}px`
+      ].join(";");
+    }
+
+    function previewFrames(entry, frameClass, scale) {
+      const frames = entry.animation?.frames?.length ? entry.animation.frames : [entry.sprite];
+      return `<div class="sprite-strip">${frames.map(frame =>
+        `<div class="sprite-frame ${frameClass}" style="${frameStyle(entry.sheet, frame, scale)}"></div>`
+      ).join("")}</div>`;
+    }
+
+    function entryBoundsPixels(entry) {
+      const frames = entry.animation?.frames?.length ? entry.animation.frames : [entry.sprite];
+      const xs = frames.map(frame => Number(frame.x || 0));
+      const ys = frames.map(frame => Number(frame.y || 0));
+      const rights = frames.map(frame => Number(frame.x || 0) + Number(frame.w || tileSize(entry.sheet)));
+      const bottoms = frames.map(frame => Number(frame.y || 0) + Number(frame.h || tileSize(entry.sheet)));
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...rights);
+      const maxY = Math.max(...bottoms);
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY
+      };
+    }
+
+    function entryForCell(row, col) {
+      const tile = tileSize();
+      const cell = {
+        left: col * tile,
+        top: row * tile,
+        right: (col + 1) * tile,
+        bottom: (row + 1) * tile
+      };
+      return currentEntries().find(entry => {
+        const frames = entry.animation?.frames?.length ? entry.animation.frames : [entry.sprite];
+        return frames.some(frame => {
+          const left = Number(frame.x ?? frame.tile_col * tile);
+          const top = Number(frame.y ?? frame.tile_row * tile);
+          const right = left + Number(frame.w || tile);
+          const bottom = top + Number(frame.h || tile);
+          return left < cell.right && right > cell.left && top < cell.bottom && bottom > cell.top;
+        });
+      });
+    }
+
+    function matches(entry) {
+      const q = els.search.value.trim().toLowerCase();
+      const family = entry.visual?.family || "unknown";
+      const usage = gameUsage(entry);
+      const haystack = [
+        entry.id, entry.name, entry.sheet, entry.category, family, entry.status,
+        entry.engine_role, entry.combat_profile, entry.meaning, entry.notes,
+        entry.dungeon_level == null ? "" : `dungeon_level_${entry.dungeon_level} L${entry.dungeon_level}`,
+        entry.unit_level == null ? "" : `unit_level_${entry.unit_level}`,
+        ...entry.enemy_spells,
+        ...entry.tags,
+        ...entry.rarity_band,
+        ...entry.encounter_roles,
+        ...entry.effects.map(effect => effect.effect),
+        ...entry.attack_types,
+        ...entry.unit_props,
+        ...usage,
+        usage.length ? "in_game tactical_sim" : "not_in_game"
+      ].join(" ").toLowerCase();
+      const show = els.showFilter.value;
+      const gameShow = els.gameFilter.value;
+      return entry.sheet === selectedSheet
+        && (!q || haystack.includes(q))
+        && (!els.categoryFilter.value || entry.category === els.categoryFilter.value)
+        && (!els.familyFilter.value || family === els.familyFilter.value)
+        && (!els.statusFilter.value || entry.status === els.statusFilter.value)
+        && (gameShow === "all"
+          || (gameShow === "in_game" && usage.length)
+          || (gameShow === "not_in_game" && !usage.length))
+        && (show === "all"
+          || (show === "active" && !entry.ignored)
+          || (show === "ignored" && entry.ignored)
+          || (show === "unmapped" && (entry.status === "unmapped" || entry.category === "unmapped")));
+    }
+
+    function renderSheet() {
+      const sheet = sheetInfo();
+      const tile = tileSize();
+      els.sheetImage.src = sheetUrl();
+      els.sheetFrame.style.width = `${sheet.width * ZOOM}px`;
+      els.sheetFrame.style.height = `${sheet.height * ZOOM}px`;
+      els.gridOverlay.style.backgroundSize = `${tile * ZOOM}px ${tile * ZOOM}px`;
+    }
+
+    function renderGameOverlay() {
+      els.gameHighlightBtn.textContent = `Game Highlight: ${gameHighlightsVisible ? "On" : "Off"}`;
+      els.gameHighlightBtn.classList.toggle("active", gameHighlightsVisible);
+      if (!gameHighlightsVisible) {
+        els.gameOverlay.innerHTML = "";
+        return;
+      }
+      const entries = currentEntries().filter(entry => gameUsage(entry).length);
+      els.gameOverlay.innerHTML = entries.map(entry => {
+        const bounds = entryBoundsPixels(entry);
+        const usage = gameUsage(entry);
+        const boss = usage.some(label => label.includes("boss"));
+        return `<div class="game-marker ${boss ? "boss" : ""}"
+          title="${escapeHtml(`${entryLabel(entry)} - ${usage.join(", ")}`)}"
+          style="left:${bounds.x * ZOOM}px;top:${bounds.y * ZOOM}px;width:${bounds.width * ZOOM}px;height:${bounds.height * ZOOM}px"></div>`;
+      }).join("");
+    }
+
+    function renderIgnoredOverlay() {
+      const entries = currentEntries().filter(entry => entry.ignored);
+      els.ignoredOverlay.innerHTML = entries.map(entry => {
+        const bounds = entryBoundsPixels(entry);
+        return `<div class="ignored-marker"
+          title="${escapeHtml(`${entryLabel(entry)} - ignored`)}"
+          style="left:${bounds.x * ZOOM}px;top:${bounds.y * ZOOM}px;width:${bounds.width * ZOOM}px;height:${bounds.height * ZOOM}px"></div>`;
+      }).join("");
+    }
+
+    function renderStats() {
+      const entries = currentEntries();
+      const active = entries.filter(entry => !entry.ignored).length;
+      const effects = entries.reduce((sum, entry) => sum + entry.effects.length, 0);
+      const paired = entries.filter(entry => entry.animation?.kind === "vertical_pair").length;
+      const inGame = entries.filter(entry => gameUsage(entry).length).length;
+      const selectedCount = selectedEntries().length;
+      const structureLabel = selectedSheet === "fx" ? `${entries.length} components` : `${paired} paired`;
+      els.stats.innerHTML = `
+        <span class="pill good">${active} active</span>
+        <span class="pill blue">${entries.length} ${selectedSheet}</span>
+        <span class="pill good">${inGame} in game</span>
+        ${selectedCount > 1 ? `<span class="pill warn">${selectedCount} selected</span>` : ""}
+        <span class="pill warn">${structureLabel}</span>
+        <span class="pill">${effects} recipes</span>
+        <span class="pill">${sheetInfo().columns} x ${sheetInfo().rows} grid</span>
+      `;
+    }
+
+    function renderList() {
+      const entries = state.entries.filter(matches);
+      els.tileList.innerHTML = entries.map(entry => {
+        const family = entry.visual?.family || "unknown";
+        const usage = gameUsage(entry);
+        const cls = ["tile-row"];
+        if (selectedIds.has(entry.id)) cls.push("selected");
+        if (entry.id === selectedId) cls.push("primary-selected");
+        if (entry.ignored) cls.push("ignored");
+        if (usage.length && gameHighlightsVisible) cls.push("in-game");
+        const dotClass = entry.ignored ? "ignored" : entry.status;
+        return `<article class="${cls.join(" ")}" data-tile="${entry.id}">
+          ${previewFrames(entry, "mini-frame", 2)}
+          <div>
+            <div class="tile-title">${escapeHtml(entryLabel(entry))}</div>
+            <div class="tile-sub">${entry.id} - ${entry.category} - ${family}${usage.length ? ` - ${usage.join(", ")}` : ""}</div>
+          </div>
+          <span class="status-dot ${dotClass}"></span>
+        </article>`;
+      }).join("");
+      document.querySelectorAll("[data-tile]").forEach(node => {
+        node.addEventListener("click", event => selectEntry(node.dataset.tile, { additive: event.shiftKey }));
+      });
+    }
+
+    function renderSelection() {
+      const entries = selectedEntries();
+      els.selectionBox.innerHTML = entries.map(entry => {
+        const bounds = entryBoundsPixels(entry);
+        return `<div class="selection-marker ${entry.id === selectedId ? "primary" : ""}"
+          style="left:${bounds.x * ZOOM}px;top:${bounds.y * ZOOM}px;width:${bounds.width * ZOOM}px;height:${bounds.height * ZOOM}px"></div>`;
+      }).join("");
+    }
+
+    function renderEditor() {
+      const entry = selectedEntry();
+      if (!entry) return;
+      const entries = selectedEntries();
+      const batch = entries.length > 1;
+      const family = entry.visual?.family || "unknown";
+      const frames = entry.animation?.frames || [entry.sprite];
+      const usage = gameUsage(entry);
+      els.bigPreview.innerHTML = batch
+        ? entries.slice(0, 4).map(selected => previewFrames(selected, "big-frame", 4)).join("")
+        : previewFrames(entry, "big-frame", 6);
+      els.editorName.textContent = batch ? `${entries.length} selected` : entryLabel(entry);
+      els.editorStatus.textContent = batch ? "batch edit" : (usage.length ? "in tactical sim" : (entry.ignored ? "ignored" : entry.status));
+      els.editorCoord.textContent = batch
+        ? `${entry.id} primary - edits apply to ${entries.length} selected entries`
+        : `${entry.id} - ${entry.sheet} - ${frames.map(frame => `r${frame.tile_row} c${frame.tile_col}`).join(" / ")}`;
+      const visibleTags = [
+        batch ? `batch:${entries.length}` : "",
+        ...usage.map(label => `in_game:${label}`),
+        entry.combat_profile ? `profile:${entry.combat_profile}` : "",
+        entry.dungeon_level == null ? "" : `dungeon:L${entry.dungeon_level}`,
+        entry.unit_level == null ? "" : `level:${entry.unit_level}`,
+        ...entry.enemy_spells.map(spell => `spell:${spell}`),
+        ...entry.attack_types.map(type => `attack:${type}`),
+        ...entry.unit_props.map(prop => `prop:${prop}`),
+        ...entry.tags
+      ].filter(Boolean);
+      els.editorTags.innerHTML = visibleTags.slice(0, 16).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("");
+
+      els.nameInput.value = entry.name;
+      els.categoryInput.value = entry.category;
+      els.familyInput.value = family;
+      els.statusInput.value = entry.status;
+      els.engineRoleInput.value = entry.engine_role || "unset";
+      els.profileInput.value = entry.combat_profile || "unset";
+      els.dungeonLevelInput.value = entry.dungeon_level == null ? "unset" : String(entry.dungeon_level);
+      els.unitLevelInput.value = entry.unit_level == null ? "" : String(entry.unit_level);
+      const protectedCount = protectedSelectedEntries().length;
+      const gameControlsDisabled = selectedSheet !== "creatures" || protectedCount > 0;
+      els.gamePoolPicker.innerHTML = GAME_POOL_OPTIONS.map(profile => {
+        const ids = GAME_ENEMY_VISUALS.pools?.[profile] || [];
+        const withPool = entries.filter(selected => ids.includes(selected.id)).length;
+        const checked = withPool === entries.length && entries.length > 0;
+        const partial = withPool > 0 && withPool < entries.length;
+        return `<label class="choice-toggle ${checked ? "active" : ""} ${partial ? "partial" : ""}">
+          <input type="checkbox" data-game-pool="${profile}" ${checked ? "checked" : ""} ${gameControlsDisabled ? "disabled" : ""}>
+          ${escapeHtml(profile)}
+        </label>`;
+      }).join("");
+      const bossSlot = entries.length === 1 ? bossSlotForEntry(entry) : "none";
+      els.bossSlotInput.value = bossSlot;
+      els.bossSlotInput.disabled = gameControlsDisabled || entries.length !== 1;
+      els.spellPicker.innerHTML = SPELL_OPTIONS.map(spell => {
+        const withSpell = entries.filter(selected => (selected.enemy_spells || []).includes(spell)).length;
+        const checked = withSpell === entries.length;
+        const partial = withSpell > 0 && withSpell < entries.length;
+        return `<label class="choice-toggle ${checked ? "active" : ""} ${partial ? "partial" : ""}">
+          <input type="checkbox" data-spell="${spell}" ${checked ? "checked" : ""}>
+          ${escapeHtml(spell)}
+        </label>`;
+      }).join("");
+      els.attackPicker.innerHTML = ATTACK_TYPE_OPTIONS.map(type => {
+        const withType = entries.filter(selected => (selected.attack_types || []).includes(type)).length;
+        const checked = withType === entries.length;
+        const partial = withType > 0 && withType < entries.length;
+        return `<label class="choice-toggle ${checked ? "active" : ""} ${partial ? "partial" : ""}">
+          <input type="checkbox" data-attack-type="${type}" ${checked ? "checked" : ""}>
+          ${escapeHtml(type)}
+        </label>`;
+      }).join("");
+      els.propsInput.value = (entry.unit_props || []).join(", ");
+      els.meaningInput.value = entry.meaning || "";
+      els.rarityInput.value = entry.rarity_band.join(", ");
+      els.rolesInput.value = entry.encounter_roles.join(", ");
+      els.tagsInput.value = entry.tags.join(", ");
+      els.notesInput.value = entry.notes || "";
+      const ignoredCount = entries.filter(selected => selected.ignored).length;
+      els.ignoredInput.checked = ignoredCount === entries.length;
+      els.ignoredInput.indeterminate = ignoredCount > 0 && ignoredCount < entries.length;
+
+      els.effectList.innerHTML = entry.effects.map((effect, index) => `
+        <div class="effect-row">
+          <select data-effect-index="${index}" data-effect-field="effect">
+            ${EFFECT_OPTIONS.map(option => `<option value="${option}" ${option === effect.effect ? "selected" : ""}>${option}</option>`).join("")}
+          </select>
+          <input data-effect-index="${index}" data-effect-field="weight" type="number" min="0" step="0.01" value="${Number(effect.weight || 0)}">
+          <button data-remove-effect="${index}" title="Remove effect">x</button>
+        </div>
+      `).join("") || `<div class="tile-sub">No effects yet.</div>`;
+
+      document.querySelectorAll("[data-effect-index]").forEach(node => {
+        node.addEventListener("input", () => setEffect(Number(node.dataset.effectIndex), node.dataset.effectField, node.value));
+      });
+      document.querySelectorAll("[data-remove-effect]").forEach(node => {
+        node.addEventListener("click", () => removeEffect(Number(node.dataset.removeEffect)));
+      });
+      document.querySelectorAll("[data-spell]").forEach(node => {
+        const selectedWithSpell = entries.filter(selected => (selected.enemy_spells || []).includes(node.dataset.spell)).length;
+        node.indeterminate = selectedWithSpell > 0 && selectedWithSpell < entries.length;
+        node.addEventListener("input", () => setSpell(node.dataset.spell, node.checked));
+      });
+      document.querySelectorAll("[data-game-pool]").forEach(node => {
+        const selectedWithPool = entries.filter(selected => (GAME_ENEMY_VISUALS.pools?.[node.dataset.gamePool] || []).includes(selected.id)).length;
+        node.indeterminate = selectedWithPool > 0 && selectedWithPool < entries.length;
+        node.addEventListener("input", () => setGamePool(node.dataset.gamePool, node.checked));
+      });
+      document.querySelectorAll("[data-attack-type]").forEach(node => {
+        const selectedWithType = entries.filter(selected => (selected.attack_types || []).includes(node.dataset.attackType)).length;
+        node.indeterminate = selectedWithType > 0 && selectedWithType < entries.length;
+        node.addEventListener("input", () => setAttackType(node.dataset.attackType, node.checked));
+      });
+
+      els.entryJson.value = JSON.stringify(batch ? entries.map(exportEntry) : exportEntry(entry), null, 2);
+    }
+
+    function renderAll() {
+      ensureSelection();
+      renderSheet();
+      renderGameOverlay();
+      renderIgnoredOverlay();
+      renderStats();
+      renderList();
+      renderSelection();
+      renderEditor();
+    }
+
+    function setEffect(index, key, value) {
+      selectedEntries().forEach(entry => {
+        if (!entry.effects[index]) return;
+        entry.effects[index][key] = key === "weight" ? Math.max(0, Number(value) || 0) : value;
+      });
+      scheduleSave("Saved");
+      renderAll();
+    }
+
+    function removeEffect(index) {
+      selectedEntries().forEach(entry => {
+        entry.effects.splice(index, 1);
+      });
+      scheduleSave("Saved");
+      renderAll();
+    }
+
+    function addEffect() {
+      selectedEntries().forEach(entry => {
+        entry.effects.push({ effect: entry.sheet === "fx" ? "impact" : "damage_budget", weight: 0.25 });
+      });
+      scheduleSave("Saved");
+      renderAll();
+    }
+
+    function normalizeWeights() {
+      selectedEntries().forEach(entry => {
+        const total = entry.effects.reduce((sum, effect) => sum + Math.max(0, Number(effect.weight) || 0), 0);
+        if (total <= 0) return;
+        entry.effects = entry.effects.map(effect => ({
+          effect: effect.effect,
+          weight: Number((Math.max(0, Number(effect.weight) || 0) / total).toFixed(3))
+        }));
+      });
+      scheduleSave("Normalized");
+      renderAll();
+    }
+
+    function ensureGameVisualCollections() {
+      GAME_ENEMY_VISUALS.pools = GAME_ENEMY_VISUALS.pools || {};
+      GAME_ENEMY_VISUALS.bosses = GAME_ENEMY_VISUALS.bosses || {};
+      GAME_POOL_OPTIONS.forEach(profile => {
+        if (!Array.isArray(GAME_ENEMY_VISUALS.pools[profile])) {
+          GAME_ENEMY_VISUALS.pools[profile] = [];
+        }
+      });
+    }
+
+    function bossSlotForEntry(entry) {
+      const match = Object.entries(GAME_ENEMY_VISUALS.bosses || {}).find(([, id]) => id === entry.id);
+      return match ? String(match[0]) : "none";
+    }
+
+    function setGamePool(profile, enabled) {
+      ensureGameVisualCollections();
+      const editable = selectedEntries().filter(entry => entry.sheet === "creatures" && !protectedFromEnemyPools(entry));
+      if (!editable.length) {
+        removeProtectedGameUsage();
+        renderAll();
+        return;
+      }
+      const ids = GAME_ENEMY_VISUALS.pools[profile];
+      editable.forEach(entry => {
+        const exists = ids.includes(entry.id);
+        if (enabled && !exists) ids.push(entry.id);
+        if (!enabled && exists) {
+          ids.splice(ids.indexOf(entry.id), 1);
+        }
+      });
+      refreshGameUsage();
+      saveTacticalVisuals("Saved game usage");
+      renderAll();
+    }
+
+    function setBossSlot(level) {
+      ensureGameVisualCollections();
+      const entries = selectedEntries();
+      if (entries.length !== 1) return;
+      const entry = entries[0];
+      if (entry.sheet !== "creatures" || protectedFromEnemyPools(entry)) {
+        removeProtectedGameUsage(entries);
+        renderAll();
+        return;
+      }
+      Object.keys(GAME_ENEMY_VISUALS.bosses).forEach(existingLevel => {
+        if (GAME_ENEMY_VISUALS.bosses[existingLevel] === entry.id) {
+          delete GAME_ENEMY_VISUALS.bosses[existingLevel];
+        }
+      });
+      if (level !== "none") {
+        GAME_ENEMY_VISUALS.bosses[level] = entry.id;
+      }
+      refreshGameUsage();
+      saveTacticalVisuals("Saved game usage");
+      renderAll();
+    }
+
+    function setSpell(spell, enabled) {
+      selectedEntries().forEach(entry => {
+        const selected = new Set(entry.enemy_spells || []);
+        if (enabled) {
+          selected.add(spell);
+        } else {
+          selected.delete(spell);
+        }
+        entry.enemy_spells = SPELL_OPTIONS.filter(option => selected.has(option));
+      });
+      scheduleSave("Saved");
+      renderAll();
+    }
+
+    function setAttackType(type, enabled) {
+      selectedEntries().forEach(entry => {
+        const selected = new Set(entry.attack_types || []);
+        if (enabled) {
+          selected.add(type);
+        } else {
+          selected.delete(type);
+        }
+        entry.attack_types = ATTACK_TYPE_OPTIONS.filter(option => selected.has(option));
+      });
+      scheduleSave("Saved");
+      renderAll();
+    }
+
+    function exportEntry(entry) {
+      return {
+        id: entry.id,
+        sheet: entry.sheet,
+        name: entry.name,
+        sprite: entry.sprite,
+        animation: entry.animation,
+        visual: entry.visual,
+        category: entry.category,
+        engine_role: entry.engine_role,
+        status: entry.status,
+        ignored: entry.ignored,
+        meaning: entry.meaning,
+        rarity_band: entry.rarity_band,
+        encounter_roles: entry.encounter_roles,
+        effect_recipe: entry.effects,
+        combat_profile: entry.combat_profile,
+        dungeon_level: entry.dungeon_level,
+        unit_level: entry.unit_level,
+        enemy_spells: entry.enemy_spells,
+        attack_types: entry.attack_types,
+        unit_props: entry.unit_props,
+        tags: entry.tags,
+        notes: entry.notes
+      };
+    }
+
+    function exportState() {
+      return {
+        version: state.version,
+        exported_at: new Date().toISOString(),
+        updated_at: state.updated_at,
+        source: state.source,
+        tile_sizes: state.tile_sizes,
+        sheets: state.sheets,
+        detection: state.detection,
+        entries: state.entries.map(exportEntry)
+      };
+    }
+
+    function exportJson() {
+      const payload = JSON.stringify(exportState(), null, 2);
+      const blob = new Blob([payload + "\n"], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `creature_fx_map_${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      saveNow("Exported");
+    }
+
+    async function copyJson() {
+      const payload = JSON.stringify(exportState(), null, 2);
+      try {
+        await navigator.clipboard.writeText(payload);
+        els.saveState.textContent = "Copied JSON";
+      } catch {
+        els.entryJson.value = payload;
+        els.entryJson.select();
+        document.execCommand("copy");
+        els.saveState.textContent = "Copied selected JSON";
+      }
+    }
+
+    function importJsonFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const imported = JSON.parse(String(reader.result || "{}"));
+          const entries = Array.isArray(imported.entries) ? imported.entries : [];
+          const currentById = new Map(state.entries.map(entry => [entry.id, entry]));
+          entries.forEach(importedEntry => {
+            const current = currentById.get(importedEntry.id);
+            if (!current) return;
+            current.name = importedEntry.name || "";
+            current.category = importedEntry.category || "unmapped";
+            current.visual.family = importedEntry.visual?.family || importedEntry.family || "unknown";
+            current.engine_role = importedEntry.engine_role || "unset";
+            current.status = importedEntry.status || importedEntry.runtime_status || "candidate";
+            current.ignored = Boolean(importedEntry.ignored);
+            current.meaning = importedEntry.meaning || "";
+            current.rarity_band = importedEntry.rarity_band || [];
+            current.encounter_roles = importedEntry.encounter_roles || [];
+            current.effects = importedEntry.effect_recipe || importedEntry.effects || [];
+            current.combat_profile = importedEntry.combat_profile || "unset";
+            current.dungeon_level = importedEntry.dungeon_level ?? null;
+            current.unit_level = importedEntry.unit_level ?? null;
+            current.enemy_spells = importedEntry.enemy_spells || [];
+            current.attack_types = importedEntry.attack_types || [];
+            current.unit_props = importedEntry.unit_props || [];
+            current.tags = importedEntry.tags || [];
+            current.notes = importedEntry.notes || "";
+          });
+          saveNow("Imported");
+          renderAll();
+        } catch (error) {
+          els.saveState.textContent = `Import failed: ${error.message}`;
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function wireEditor() {
+      const bindValue = (node, handler, events = ["input"]) => {
+        events.forEach(eventName => node.addEventListener(eventName, handler));
+      };
+      const selectEvents = ["input", "change"];
+
+      bindValue(els.nameInput, () => updateSelected({ name: els.nameInput.value }));
+      bindValue(els.categoryInput, () => updateSelected({ category: els.categoryInput.value }), selectEvents);
+      bindValue(els.familyInput, () => {
+        updateSelectedVisualFamily(els.familyInput.value);
+      }, selectEvents);
+      bindValue(els.statusInput, () => updateSelected({ status: els.statusInput.value }), selectEvents);
+      bindValue(els.engineRoleInput, () => updateSelected({ engine_role: els.engineRoleInput.value }), selectEvents);
+      bindValue(els.profileInput, () => updateSelected({ combat_profile: els.profileInput.value }), selectEvents);
+      bindValue(els.dungeonLevelInput, () => updateSelected({ dungeon_level: numericOrNull(els.dungeonLevelInput.value) }), selectEvents);
+      bindValue(els.unitLevelInput, () => updateSelected({ unit_level: numericOrNull(els.unitLevelInput.value) }));
+      bindValue(els.bossSlotInput, () => setBossSlot(els.bossSlotInput.value), selectEvents);
+      els.propsInput.addEventListener("input", () => updateSelected({ unit_props: normalizeCsv(els.propsInput.value) }));
+      els.meaningInput.addEventListener("input", () => updateSelected({ meaning: els.meaningInput.value }));
+      els.rarityInput.addEventListener("input", () => updateSelected({ rarity_band: normalizeCsv(els.rarityInput.value) }));
+      els.rolesInput.addEventListener("input", () => updateSelected({ encounter_roles: normalizeCsv(els.rolesInput.value) }));
+      els.tagsInput.addEventListener("input", () => updateSelected({ tags: normalizeCsv(els.tagsInput.value) }));
+      els.notesInput.addEventListener("input", () => updateSelected({ notes: els.notesInput.value }));
+      bindValue(els.ignoredInput, () => updateSelected({ ignored: els.ignoredInput.checked }), ["input", "change"]);
+      els.addEffectBtn.addEventListener("click", addEffect);
+      els.normalizeBtn.addEventListener("click", normalizeWeights);
+    }
+
+    function wireSheet() {
+      els.sheetFrame.addEventListener("mousemove", event => {
+        const sheet = sheetInfo();
+        const tile = tileSize();
+        const rect = els.sheetFrame.getBoundingClientRect();
+        const col = Math.floor((event.clientX - rect.left) / (tile * ZOOM));
+        const row = Math.floor((event.clientY - rect.top) / (tile * ZOOM));
+        if (row < 0 || col < 0 || row >= sheet.rows || col >= sheet.columns) {
+          els.hoverBox.hidden = true;
+          return;
+        }
+        const hoveredEntry = selectedSheet === "fx" ? entryForCell(row, col) : null;
+        const bounds = hoveredEntry ? entryBoundsPixels(hoveredEntry) : null;
+        const hoverRow = selectedSheet === "creatures" ? row - (row % 2) : row;
+        els.hoverBox.hidden = false;
+        els.hoverBox.style.left = `${(bounds ? bounds.x : col * tile) * ZOOM}px`;
+        els.hoverBox.style.top = `${(bounds ? bounds.y : hoverRow * tile) * ZOOM}px`;
+        els.hoverBox.style.width = `${(bounds ? bounds.width : tile) * ZOOM}px`;
+        els.hoverBox.style.height = `${(bounds ? bounds.height : tile * (selectedSheet === "creatures" ? 2 : 1)) * ZOOM}px`;
+      });
+      els.sheetFrame.addEventListener("mouseleave", () => {
+        els.hoverBox.hidden = true;
+      });
+      els.sheetFrame.addEventListener("click", event => {
+        const tile = tileSize();
+        const rect = els.sheetFrame.getBoundingClientRect();
+        const col = Math.floor((event.clientX - rect.left) / (tile * ZOOM));
+        const row = Math.floor((event.clientY - rect.top) / (tile * ZOOM));
+        const entry = entryForCell(row, col);
+        if (entry) selectEntry(entry.id, { scrollList: true, additive: event.shiftKey });
+      });
+    }
+
+    function wireFilters() {
+      els.sheetFilter.addEventListener("input", () => setSheet(els.sheetFilter.value));
+      [els.search, els.categoryFilter, els.familyFilter, els.statusFilter, els.gameFilter, els.showFilter].forEach(node => {
+        node.addEventListener("input", renderAll);
+      });
+    }
+
+    function wireImportExport() {
+      els.exportBtn.addEventListener("click", exportJson);
+      els.copyJsonBtn.addEventListener("click", copyJson);
+      els.gameHighlightBtn.addEventListener("click", () => {
+        gameHighlightsVisible = !gameHighlightsVisible;
+        localStorage.setItem(`${STORAGE_KEY}_game_highlights`, gameHighlightsVisible ? "on" : "off");
+        renderAll();
+      });
+      els.importBtn.addEventListener("click", () => els.importFile.click());
+      els.importFile.addEventListener("change", () => {
+        const file = els.importFile.files[0];
+        if (file) importJsonFile(file);
+        els.importFile.value = "";
+      });
+      els.resetBtn.addEventListener("click", () => {
+        if (!confirm("Reset local creature/FX mapper edits back to generated seed catalog?")) return;
+        state = buildSeedState();
+        setSingleSelection(currentEntries().find(entry => !entry.ignored)?.id || currentEntries()[0]?.id || "");
+        saveNow("Reset");
+        renderAll();
+      });
+    }
+
+    function boot() {
+      fillPlainSelect(els.sheetFilter, Object.keys(CATALOG.sheets));
+      applyModeChrome();
+      fillSelect(els.categoryFilter, "All categories", CATEGORY_OPTIONS);
+      fillSelect(els.familyFilter, "All families", FAMILY_OPTIONS);
+      fillSelect(els.statusFilter, "All statuses", STATUS_OPTIONS);
+      fillPlainSelect(els.categoryInput, CATEGORY_OPTIONS);
+      fillPlainSelect(els.familyInput, FAMILY_OPTIONS);
+      fillPlainSelect(els.statusInput, STATUS_OPTIONS);
+      fillPlainSelect(els.engineRoleInput, ROLE_OPTIONS);
+      fillPlainSelect(els.profileInput, PROFILE_OPTIONS);
+      fillPlainSelect(els.dungeonLevelInput, DUNGEON_LEVEL_OPTIONS);
+      fillPlainSelect(els.bossSlotInput, BOSS_SLOT_OPTIONS);
+
+      selectedSheet = LOCKED_SHEET || localStorage.getItem(`${STORAGE_KEY}_sheet`) || "creatures";
+      if (!CATALOG.sheets[selectedSheet]) selectedSheet = Object.keys(CATALOG.sheets)[0];
+      els.sheetFilter.value = selectedSheet;
+      state = loadState();
+      setSingleSelection(currentEntries().find(entry => !entry.ignored)?.id || currentEntries()[0]?.id || "");
+      wireEditor();
+      wireSheet();
+      wireFilters();
+      wireImportExport();
+      if (loadNeedsSave) {
+        saveNow(loadMessage);
+      } else {
+        els.saveState.textContent = loadMessage;
+      }
+      renderAll();
+    }
+
+    boot();
+  </script>
+</body>
+</html>
